@@ -155,6 +155,11 @@ class OptimizeRankedRequest(BaseModel):
     use_cache: bool = True
     prefs: Preferences = Preferences()
 
+@app.get("/")
+def root():
+    return {"status": "ok", "message": "HKUST Timetable Optimizer API is running"}
+
+
 @app.post("/optimize/ranked")
 def optimize_ranked(req: OptimizeRankedRequest):
     if not req.course_codes:
