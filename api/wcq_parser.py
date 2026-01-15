@@ -4,14 +4,18 @@ import re
 from typing import Any
 
 from bs4 import BeautifulSoup
+from bs4.exceptions import FeatureNotFound
 
 # -------- Course header detection --------
 COURSE_HEADER_RE = re.compile(
     r"^([A-Z]{3,5})\s*(\d{4}[A-Z]?)\s*-\s*(.*?)\s*\((\d+)\s*units?\)\s*$"
 )
 
-def parse_subject_html(html: str, term: str, subject: str) -> dict[str, Any]:
-    soup = BeautifulSoup(html, "lxml")
+def parse_subject_html(html: str, term: str, subject: str):
+    try:
+        soup = BeautifulSoup(html, "lxml")        # fastest
+    except FeatureNotFound:
+        soup = BeautifulSoup(html, "html.parser") # always available
 
     # Find tables that look like the section/quota table (has these headers)
     candidate_tables = []
