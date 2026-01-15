@@ -17,7 +17,7 @@ from optimizer_basic import CourseChoice, find_schedules, schedule_to_json
 from pydantic import BaseModel, Field
 from fastapi import Body
 
-from bundles import build_bundles
+from bundles import build_bundles, MatchingConstraint
 from optimizer_bundles import BundleChoice, find_bundle_schedules, schedule_to_json as schedule_to_json_bundles
 
 from typing import Any, Optional, Dict, List
@@ -30,6 +30,10 @@ from optimizer_bundles import BundleChoice, find_bundle_schedules, schedule_to_j
 from fastapi.middleware.cors import CORSMiddleware
 
 from wcq_subjects import list_subjects
+
+from catalog_state import load_state
+
+from mini_catalog import load_mini_catalog
 
 app = FastAPI()
 
@@ -103,6 +107,15 @@ def _load_courses_with_cache(
                 course_map[c.course_code] = c
 
     return course_map, sorted(subjects_to_fetch), cache_misses
+
+
+def _get_matching_constraint(mini_catalog: Dict[str, Any], course_code: str) -> MatchingConstraint:
+    """Get matching constraint for a course from mini-catalog."""
+    entry = mini_catalog.get(course_code, {})
+    return MatchingConstraint(
+        matching_required=entry.get("matching_required", False),
+        matching_type=entry.get("matching_type")
+    )
 
 
 class Weights(BaseModel):
@@ -179,10 +192,15 @@ def optimize_ranked(req: OptimizeRankedRequest):
             "cache_misses": cache_misses,
         }
 
+    # Load mini-catalog for matching constraints
+    mini_catalog = load_mini_catalog(req.term)
+    missing_catalog_entries = [cc for cc in req.course_codes if cc not in mini_catalog]
+
     choices = []
     for cc in req.course_codes:
         course = course_map[cc]
-        bundles = build_bundles(course)
+        constraint = _get_matching_constraint(mini_catalog, cc)
+        bundles = build_bundles(course, constraint)
         choices.append(BundleChoice(course_code=cc, bundles=[b.parts for b in bundles]))
 
     # Find a pool of feasible schedules. We'll cap by search_limit by requesting more solutions.
@@ -206,7 +224,7 @@ def optimize_ranked(req: OptimizeRankedRequest):
     scored.sort(key=lambda x: x[0], reverse=True)
     top = scored[: req.max_solutions]
 
-    return {
+    result = {
         "ok": True,
         "term": req.term,
         "subjects_fetched": subjects_fetched,
@@ -222,6 +240,15 @@ def optimize_ranked(req: OptimizeRankedRequest):
             for (s, why, sch) in top
         ],
     }
+    
+    # Add warning if some courses aren't in mini-catalog
+    if missing_catalog_entries:
+        result["_warnings"] = {
+            "missing_catalog_entries": missing_catalog_entries,
+            "note": "These courses used default matching rules (no constraints)"
+        }
+    
+    return result
 
 @app.get("/wcq/courses")
 def list_courses(term: str, subject: str, refresh: bool = False):
@@ -265,7 +292,7 @@ def optimize_basic(req: OptimizeBasicRequest = Body(...)):
             return {
                 "ok": False,
                 "error": "No clash-free schedule exists with 1 section per course (v1).",
-                "note": "Some courses require lecture+tutorial+lab pairing; we’ll support that in the next milestone.",
+                "note": "Some courses require lecture+tutorial+lab pairing; we'll support that in the next milestone.",
             }
 
         return {
@@ -298,10 +325,15 @@ def optimize_bundles(req: OptimizeBasicRequest):
             "cache_misses": cache_misses,
         }
 
+    # Load mini-catalog for matching constraints
+    mini_catalog = load_mini_catalog(req.term)
+    missing_catalog_entries = [cc for cc in req.course_codes if cc not in mini_catalog]
+
     choices = []
     for cc in req.course_codes:
         course = course_map[cc]
-        bundles = build_bundles(course)  # list[Bundle]
+        constraint = _get_matching_constraint(mini_catalog, cc)
+        bundles = build_bundles(course, constraint)
         if not bundles:
             return {"ok": False, "error": f"No bundle options found for {cc}"}
         choices.append(BundleChoice(course_code=cc, bundles=[b.parts for b in bundles]))
@@ -313,13 +345,22 @@ def optimize_bundles(req: OptimizeBasicRequest):
             "error": "No clash-free schedule exists with LEC/TUT/LAB bundling.",
         }
 
-    return {
+    result = {
         "ok": True,
         "term": req.term,
         "subjects_fetched": subjects_fetched,
         "cache_misses": cache_misses,
         "solutions": [schedule_to_json_bundles(sol) for sol in solutions],
     }
+    
+    # Add warning if some courses aren't in mini-catalog
+    if missing_catalog_entries:
+        result["_warnings"] = {
+            "missing_catalog_entries": missing_catalog_entries,
+            "note": "These courses used default matching rules (no constraints)"
+        }
+    
+    return result
 
 
 @app.get("/health")
@@ -355,15 +396,13 @@ def wcq_subject(term: str = Query(...), subject: str = Query(...), refresh: int 
                     mtg["start_min"] = to_minutes(mtg["start"])
                     mtg["end_min"] = to_minutes(mtg["end"])
 
-        # validate schema
-        validated = SubjectPayload.model_validate(parsed).model_dump()
-
-        validated["_meta"] = {
+        # Don't validate with SubjectPayload model as it doesn't have matching fields
+        # Just return the parsed data with metadata
+        parsed["_meta"] = {
             "cache_hit": result.cache_hit,
             "fetched_at": result.fetched_at,
             "url": result.url,
         }
-        return validated
+        return parsed
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
-

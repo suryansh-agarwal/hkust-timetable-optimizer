@@ -29,7 +29,7 @@ SUBJECTS_CACHE_MAX_AGE_SEC = 12 * 60 * 60
 
 class BuildCatalogRequest(BaseModel):
     term: str
-    max_subjects: Optional[int] = None
+    max_subjects: None
     force: bool = False
 
 
@@ -157,8 +157,6 @@ def build_catalog(req: BuildCatalogRequest = Body(...)):
         }
 
     subjects = get_all_subjects(term)
-    if req.max_subjects:
-        subjects = subjects[: req.max_subjects]
 
     catalog: dict[str, Any] = {"term": term, "built_at": None, "subjects": {}}
     failed_subjects: list[dict[str, str]] = []

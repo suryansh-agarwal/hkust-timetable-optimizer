@@ -1,22 +1,35 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { catalogSearch } from "@/lib/api";
+import { useEffect, useState, useMemo } from "react";
+import { loadCourseIndex, searchCourseIndex, getIndexCacheStatus, CourseIndexEntry } from "@/lib/api";
 
-type CourseLite = { course_code: string; title: string; units?: number; subject?: string };
+function IndexStatusBadge({ loading, error, ready, count }: Readonly<{ loading: boolean; error: string; ready: boolean; count: number }>) {
+  if (loading) {
+    return <span style={{ fontSize: 12, color: "#666" }}>Loading index...</span>;
+  }
+  if (error) {
+    return <span style={{ fontSize: 12, color: "crimson" }} title={error}>⚠️ Index error</span>;
+  }
+  if (ready) {
+    return <span style={{ fontSize: 12, color: "#22c55e" }}>✓ Index: {count.toLocaleString()} courses</span>;
+  }
+  return <span style={{ fontSize: 12, color: "#666" }}>Index not loaded</span>;
+}
 
 export function CoursePicker(props: Readonly<{
   term: string;
-  catalogReady: boolean;
   selected: string[];
   setSelected: (codes: string[]) => void;
 }>) {
-  const { term, catalogReady, selected, setSelected } = props;
+  const { term, selected, setSelected } = props;
 
   const [q, setQ] = useState("");
-  const [results, setResults] = useState<CourseLite[]>([]);
-  const [searching, setSearching] = useState(false);
-  const [searchError, setSearchError] = useState("");
+  const [indexStatus, setIndexStatus] = useState<{ loaded: boolean; count: number; error: string }>({
+    loaded: false,
+    count: 0,
+    error: "",
+  });
+  const [indexLoading, setIndexLoading] = useState(false);
 
   function add(courseCode: string) {
     if (selected.includes(courseCode)) return;
@@ -27,45 +40,49 @@ export function CoursePicker(props: Readonly<{
     setSelected(selected.filter((x) => x !== courseCode));
   }
 
+  // Load index when term changes
   useEffect(() => {
     let cancelled = false;
-    if (!catalogReady) {
-      setResults([]);
-      setSearching(false);
-      setSearchError("");
-      return;
-    }
 
-    const needle = q.trim();
-    if (!needle) {
-      setResults([]);
-      setSearching(false);
-      setSearchError("");
-      return;
-    }
+    async function loadIndex() {
+      setIndexLoading(true);
+      setIndexStatus({ loaded: false, count: 0, error: "" });
 
-    setSearching(true);
-    const handle = setTimeout(async () => {
       try {
-        const data = await catalogSearch(term, needle, 20);
+        const data = await loadCourseIndex(term);
         if (cancelled) return;
-        const list = Array.isArray(data) ? data : (data?.courses ?? data?.results ?? data?.items ?? []);
-        setResults(list);
-        setSearchError("");
-      } catch (e: any) {
+        setIndexStatus({ loaded: true, count: data.length, error: "" });
+      } catch (e: unknown) {
         if (cancelled) return;
-        setSearchError(e?.message ?? String(e));
-        setResults([]);
+        const errorMsg = e instanceof Error ? e.message : String(e);
+        setIndexStatus({ loaded: false, count: 0, error: errorMsg });
       } finally {
-        if (!cancelled) setSearching(false);
+        if (!cancelled) setIndexLoading(false);
       }
-    }, 250);
+    }
+
+    // Check if already cached
+    const cached = getIndexCacheStatus(term);
+    if (cached.loaded) {
+      setIndexStatus({ loaded: true, count: cached.count, error: "" });
+    } else {
+      loadIndex();
+    }
 
     return () => {
       cancelled = true;
-      clearTimeout(handle);
     };
-  }, [catalogReady, q, term]);
+  }, [term]);
+
+  // Search results (computed from cached index)
+  const results = useMemo<CourseIndexEntry[]>(() => {
+    if (!indexStatus.loaded) return [];
+    const needle = q.trim();
+    if (!needle) return [];
+    return searchCourseIndex(term, needle, 20);
+  }, [indexStatus.loaded, q, term]);
+
+  const indexReady = indexStatus.loaded;
 
   return (
     <div style={{ border: "1px solid #ddd", borderRadius: 12, padding: 16 }}>
@@ -73,7 +90,24 @@ export function CoursePicker(props: Readonly<{
 
       <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "center", flexWrap: "wrap" }}>
         <div style={{ fontSize: 12, color: "#666" }}>Term: <b>{term}</b></div>
+        <IndexStatusBadge
+          loading={indexLoading}
+          error={indexStatus.error}
+          ready={indexReady}
+          count={indexStatus.count}
+        />
       </div>
+
+      {/* Index error details */}
+      {indexStatus.error && (
+        <div style={{ marginTop: 8, padding: 10, background: "#fff5f5", borderRadius: 8, fontSize: 12, color: "crimson" }}>
+          <div style={{ fontWeight: 600 }}>Could not load course index:</div>
+          <div style={{ marginTop: 4 }}>{indexStatus.error}</div>
+          <div style={{ marginTop: 6, color: "#666" }}>
+            Tip: Make sure the index file exists at <code>/course-index/{term}.json</code>
+          </div>
+        </div>
+      )}
 
       {/* selected chips */}
       <div style={{ marginTop: 12 }}>
@@ -122,41 +156,65 @@ export function CoursePicker(props: Readonly<{
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder='Search (e.g. "COMP 2011" or "econometrics")'
-          disabled={!catalogReady}
+          placeholder='Search (e.g. "FINA 2303" or "econometrics")'
+          disabled={!indexReady}
           style={{ padding: 8, width: "100%" }}
         />
       </div>
 
       {/* list */}
       <div style={{ marginTop: 10, maxHeight: 320, overflow: "auto", border: "1px solid #eee", borderRadius: 10 }}>
-        {!catalogReady && (
+        {!indexReady && !indexStatus.error && !indexLoading && (
           <div style={{ padding: 12, color: "#999" }}>
-            Catalog not built; build it to enable global search.
+            Index not loaded yet.
           </div>
         )}
-        {catalogReady && searching && (
-          <div style={{ padding: 12, color: "#777" }}>Searching...</div>
+        {indexLoading && (
+          <div style={{ padding: 12, color: "#777" }}>Loading course index...</div>
         )}
-        {catalogReady && !searching && q.trim() === "" && (
+        {indexReady && q.trim() === "" && (
           <div style={{ padding: 12, color: "#999" }}>
-            Start typing to search the catalog.
+            Start typing to search courses.
           </div>
         )}
-        {catalogReady && !searching && searchError && (
-          <div style={{ padding: 12, color: "crimson", whiteSpace: "pre-wrap" }}>{searchError}</div>
-        )}
-        {catalogReady && !searching && !searchError && q.trim() !== "" && results.length === 0 && (
+        {indexReady && q.trim() !== "" && results.length === 0 && (
           <div style={{ padding: 12, color: "#999" }}>
             No results found.
           </div>
         )}
-        {catalogReady && results.map((c) => {
+        {indexReady && results.map((c) => {
           const on = selected.includes(c.course_code);
+          
+          // Compute matching label based on matching_type
+          let matchingLabel: string | null = null;
+          if (c.matching_required) {
+            if (c.matching_type === "both") matchingLabel = "L+LA+T matching";
+            else if (c.matching_type === "lab") matchingLabel = "L+LA matching";
+            else if (c.matching_type === "tutorial") matchingLabel = "L+T matching";
+            else matchingLabel = "Matching req.";
+          }
           return (
             <div key={c.course_code} style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: 10, borderBottom: "1px solid #f3f3f3" }}>
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontWeight: 800 }}>{c.course_code}</div>
+                <div style={{ fontWeight: 800 }}>
+                  {c.course_code}
+                  {matchingLabel && (
+                    <span
+                      style={{
+                        marginLeft: 8,
+                        fontSize: 10,
+                        fontWeight: 600,
+                        background: "#fef3c7",
+                        color: "#92400e",
+                        padding: "2px 6px",
+                        borderRadius: 4,
+                      }}
+                      title={c.header_remarks?.join(" | ") ?? "Matching between lecture and section required"}
+                    >
+                      {matchingLabel}
+                    </span>
+                  )}
+                </div>
                 <div style={{ fontSize: 12, color: "#666", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.title}</div>
                 <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>
                   {c.subject ? `${c.subject} • ` : ""}{c.units ?? "-"} units

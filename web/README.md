@@ -1,5 +1,44 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Course Index
+
+The app uses a static course index for fast client-side search. This avoids dependency on the backend catalog endpoints which may timeout on free-tier hosting.
+
+### Building the Course Index
+
+To generate/update the course index, run from the repository root:
+
+```bash
+# Start the local backend first
+cd api && uvicorn main:app --reload --port 8000
+
+# Test the subjects endpoint (should return JSON with subjects array)
+curl -sS "http://127.0.0.1:8000/wcq/subjects?term=2530" | head
+
+# In another terminal, build the index
+python scripts/build_course_index.py \
+  --term 2530 \
+  --api-base http://127.0.0.1:8000 \
+  --out web/public/course-index/2530.json
+```
+
+The script will:
+1. Fetch all subjects for the term
+2. Fetch courses for each subject
+3. Extract only essential data (course_code, title, units, subject)
+4. Output a compact JSON file
+
+**Commit the generated JSON** so Vercel serves it statically.
+
+### Multiple Terms
+
+To support multiple terms, run the script for each term:
+
+```bash
+python scripts/build_course_index.py --term 2530 --api-base http://127.0.0.1:8000 --out web/public/course-index/2530.json
+python scripts/build_course_index.py --term 2540 --api-base http://127.0.0.1:8000 --out web/public/course-index/2540.json
+```
+
 ## Getting Started
 
 First, run the development server:

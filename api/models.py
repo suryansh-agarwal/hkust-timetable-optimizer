@@ -37,6 +37,10 @@ class Course(BaseModel):
     title: str
     units: int
     sections: List[Section] = Field(default_factory=list)
+    # Matching constraint metadata (from mini-catalog or parsed HTML)
+    matching_required: bool = False
+    matching_type: Optional[str] = None  # "lab" | "tutorial" | "both" | None
+    header_remarks: Optional[List[str]] = None
 
 
 class SubjectPayload(BaseModel):

@@ -11,6 +11,79 @@ COURSE_HEADER_RE = re.compile(
     r"^([A-Z]{3,5})\s*(\d{4}[A-Z]?)\s*-\s*(.*?)\s*\((\d+)\s*units?\)\s*$"
 )
 
+# -------- Matching requirement detection --------
+MATCHING_PATTERN = re.compile(
+    r"matching\s+between\s+lecture\s*(?:and|&)\s*(lab|tutorial|lab\s*(?:and|&)\s*tutorial|tutorial\s*(?:and|&)\s*lab)\s+required",
+    re.IGNORECASE
+)
+
+
+def detect_matching_requirement(text: str) -> tuple[bool, str | None]:
+    """
+    Detect matching requirements from course remark text.
+    
+    Returns (matching_required, matching_type) where:
+    - matching_required: True if matching is required
+    - matching_type: "lab" | "tutorial" | "both" | None
+    """
+    # Normalize text: lowercase, collapse whitespace
+    normalized = " ".join(text.lower().split())
+    
+    match = MATCHING_PATTERN.search(normalized)
+    if not match:
+        return False, None
+    
+    component = match.group(1).lower()
+    
+    # Determine matching_type
+    has_lab = "lab" in component
+    has_tutorial = "tutorial" in component
+    
+    if has_lab and has_tutorial:
+        return True, "both"
+    elif has_lab:
+        return True, "lab"
+    elif has_tutorial:
+        return True, "tutorial"
+    else:
+        return True, None
+
+
+def extract_course_remarks(table, course_header_node) -> list[str]:
+    """
+    Extract remarks that appear between the course header and the sections table.
+    These often contain matching requirements and other important notes.
+    """
+    remarks = []
+    
+    # Get all elements between header and table
+    current = course_header_node.find_next()
+    while current and current != table:
+        if hasattr(current, 'get_text'):
+            text = current.get_text(" ", strip=True)
+            # Look for remarks - often in red/bold or specific classes
+            if text and len(text) > 5 and len(text) < 500:
+                # Check if it's likely a remark (contains keywords)
+                text_lower = text.lower()
+                if any(kw in text_lower for kw in [
+                    'matching', 'required', 'prerequisite', 'corequisite', 
+                    'consent', 'approval', 'restriction', 'note', 'important'
+                ]):
+                    remarks.append(text.strip())
+        current = current.find_next()
+    
+    # Deduplicate while preserving order
+    seen = set()
+    unique_remarks = []
+    for r in remarks:
+        r_normalized = " ".join(r.split())
+        if r_normalized not in seen:
+            seen.add(r_normalized)
+            unique_remarks.append(r_normalized)
+    
+    return unique_remarks
+
+
 def parse_subject_html(html: str, term: str, subject: str):
     try:
         soup = BeautifulSoup(html, "lxml")        # fastest
@@ -49,16 +122,36 @@ def parse_subject_html(html: str, term: str, subject: str):
         units = int(units_s)
 
         if course_code not in course_map:
+            # Extract header remarks (between course title and sections table)
+            header_remarks = extract_course_remarks(table, prev_text_node)
+            
+            # Detect matching requirements from header remarks
+            all_remarks_text = " ".join(header_remarks)
+            matching_required, matching_type = detect_matching_requirement(all_remarks_text)
+            
             course_map[course_code] = {
                 "course_code": course_code,
                 "title": title,
                 "units": units,
                 "sections": [],
+                "matching_required": matching_required,
+                "matching_type": matching_type,
+                "header_remarks": header_remarks if header_remarks else None,
             }
             courses.append(course_map[course_code])
 
         sections = parse_sections_table(table)
         course_map[course_code]["sections"].extend(sections)
+        
+        # Also check section remarks for matching requirements (fallback)
+        if not course_map[course_code]["matching_required"]:
+            for sec in sections:
+                for remark in sec.get("remarks", []):
+                    req, mtype = detect_matching_requirement(remark)
+                    if req:
+                        course_map[course_code]["matching_required"] = True
+                        course_map[course_code]["matching_type"] = mtype
+                        break
 
     return {"term": term, "subject": subject, "courses": courses}
 
@@ -223,4 +316,3 @@ def parse_sections_table(table) -> list[dict[str, Any]]:
         s["meetings"] = uniq
 
     return sections
-

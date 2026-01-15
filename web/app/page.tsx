@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { catalogBuild, catalogStatus, optimizeRanked, Prefs, refreshQuotas } from "@/lib/api";
+import { useMemo, useState } from "react";
+import { optimizeRanked, Prefs } from "@/lib/api";
 import { TimetableGrid, CompareTimetableGrid } from "./components/TimetableGrid";
 import { CoursePicker } from "./components/CoursePicker";
 
@@ -54,17 +54,17 @@ type Pinned = {
   name: string;
   term: string;
   score: number;
-  breakdown: any;
-  schedule: any[];
+  breakdown: unknown;
+  schedule: unknown[];
   createdAt: number;
 };
 
 function makePinId() {
   return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
 }
-function flattenSchedule(schedule: any[]): Meeting[] {
+function flattenSchedule(schedule: unknown[]): Meeting[] {
   const out: Meeting[] = [];
-  for (const c of schedule) {
+  for (const c of schedule as { course_code: string; parts: { section: string; meetings: { day: string; start_min: number; end_min: number }[] }[] }[]) {
     for (const p of c.parts) {
       for (const mtg of p.meetings) {
         out.push({
@@ -123,7 +123,7 @@ function formatDayList(days: string[]) {
   return days.join(", ");
 }
 
-function penaltyLabel(p: any) {
+function penaltyLabel(p: { type: string; day?: string; cutoff?: string; minutes?: number }) {
   // make the labels less ugly than raw types
   if (p.type === "soft_no_after") return `After cutoff (${p.day} ${p.cutoff})`;
   if (p.type === "gaps_minutes") return `Gaps (${p.minutes} min)`;
@@ -131,7 +131,7 @@ function penaltyLabel(p: any) {
   return p.type;
 }
 
-function bonusLabel(b: any) {
+function bonusLabel(b: { type: string; value?: number }) {
   if (b.type === "free_days") return `Free days (+${b.value})`;
   if (b.type === "compact_days") return `Compact days (+${b.value})`;
   return b.type;
@@ -142,12 +142,6 @@ export default function Home() {
   const [term, setTerm] = useState("2530");
 
   const [selectedCourses, setSelectedCourses] = useState<string[]>(["COMP 2011", "ECON 3334", "MATH 2350"]);
-  const [catalogInfo, setCatalogInfo] = useState<any>(null);
-  const [catalogLoading, setCatalogLoading] = useState(false);
-  const [catalogError, setCatalogError] = useState("");
-  const [catalogActionError, setCatalogActionError] = useState("");
-  const [buildingCatalog, setBuildingCatalog] = useState(false);
-  const [refreshingQuotas, setRefreshingQuotas] = useState(false);
 
   // Hard free days (multi-select)
   const [hardFreeDays, setHardFreeDays] = useState<string[]>([]);
@@ -174,7 +168,7 @@ export default function Home() {
   const [compactDays, setCompactDays] = useState(true);
 
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<{ results: { score: number; breakdown: { penalties?: unknown[]; bonuses?: unknown[] }; schedule: unknown[] }[]; considered: number; returned: number } | null>(null);
   const [activeIdx, setActiveIdx] = useState(0);
   const [error, setError] = useState<string>("");
 
@@ -183,7 +177,12 @@ export default function Home() {
   const [compareA, setCompareA] = useState<string>(""); // pinned id
   const [compareB, setCompareB] = useState<string>(""); // pinned id
 
-  function pinResultOption(r: any, idx: number) {
+  // Reset when term changes
+  const handleTermChange = (newTerm: string) => {
+    setTerm(newTerm);
+  };
+
+  function pinResultOption(r: { score: number; breakdown: unknown; schedule: unknown[] }, idx: number) {
     const id = makePinId();
     const name = `Pinned #${pinned.length + 1} (Opt ${idx + 1})`;
     const item: Pinned = {
@@ -213,51 +212,6 @@ export default function Home() {
 
   const meetingsA = useMemo(() => (pinnedA ? flattenSchedule(pinnedA.schedule) : []), [pinnedA]);
   const meetingsB = useMemo(() => (pinnedB ? flattenSchedule(pinnedB.schedule) : []), [pinnedB]);
-
-  async function loadCatalogStatus() {
-    setCatalogLoading(true);
-    setCatalogError("");
-    try {
-      const data = await catalogStatus(term);
-      setCatalogInfo(data);
-    } catch (e: any) {
-      setCatalogError(e?.message ?? String(e));
-      setCatalogInfo(null);
-    } finally {
-      setCatalogLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    loadCatalogStatus();
-  }, [term]);
-
-  async function handleCatalogBuild(force = false) {
-    setBuildingCatalog(true);
-    setCatalogActionError("");
-    try {
-      await catalogBuild(term, force);
-      await loadCatalogStatus();
-    } catch (e: any) {
-      setCatalogActionError(e?.message ?? String(e));
-    } finally {
-      setBuildingCatalog(false);
-    }
-  }
-
-  async function handleRefreshQuotas() {
-    if (selectedCourses.length === 0) return;
-    setRefreshingQuotas(true);
-    setCatalogActionError("");
-    try {
-      await refreshQuotas(term, undefined, selectedCourses);
-      await loadCatalogStatus();
-    } catch (e: any) {
-      setCatalogActionError(e?.message ?? String(e));
-    } finally {
-      setRefreshingQuotas(false);
-    }
-  }
 
   async function runOptimize() {
     setLoading(true);
@@ -297,8 +251,9 @@ export default function Home() {
     try {
       const data = await optimizeRanked(term, selectedCourses, prefs, 5);
       setResult(data);
-    } catch (e: any) {
-      setError(e.message ?? String(e));
+    } catch (e: unknown) {
+      const errorMsg = e instanceof Error ? e.message : String(e);
+      setError(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -306,16 +261,6 @@ export default function Home() {
 
   const active = result?.results?.[activeIdx];
   const meetings = useMemo(() => (active ? flattenSchedule(active.schedule) : []), [active]);
-  const catalogReady = !!catalogInfo?.exists;
-  const catalogAgeSec = typeof catalogInfo?.age_sec === "number" ? catalogInfo.age_sec : null;
-  const catalogAgeHours = catalogAgeSec === null ? null : Math.max(0, catalogAgeSec) / 3600;
-  const catalogAgeLabel = catalogAgeHours === null ? "unknown" : `${catalogAgeHours.toFixed(1)} hours ago`;
-  let catalogStatusText = "Catalog missing";
-  if (catalogLoading) {
-    catalogStatusText = "Catalog: loading...";
-  } else if (catalogReady) {
-    catalogStatusText = `Catalog: built ${catalogAgeLabel}`;
-  }
 
   return (
     <div style={{ maxWidth: 980, margin: "0 auto", padding: 16, fontFamily: "system-ui" }}>
@@ -330,7 +275,7 @@ export default function Home() {
             <select
               id="term-select"
               value={term}
-              onChange={(e) => setTerm(e.target.value)}
+              onChange={(e) => handleTermChange(e.target.value)}
               style={{ padding: 8, width: "100%" }}
             >
               {TERMS.map((t) => (
@@ -341,46 +286,8 @@ export default function Home() {
             </select>
           </div>
 
-          <div style={{ marginBottom: 10 }}>
-            <div style={{ fontSize: 13, color: "#666", marginBottom: 6 }}>Catalog</div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              <div style={{ fontSize: 13 }}>
-                {catalogStatusText}
-              </div>
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                <button
-                  type="button"
-                  onClick={() => handleCatalogBuild(false)}
-                  disabled={buildingCatalog}
-                  style={{ padding: "4px 8px", fontSize: 11, borderRadius: 6, border: "1px solid #ddd", fontWeight: 700 }}
-                >
-                  {buildingCatalog ? "Building..." : "Build catalog"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleCatalogBuild(true)}
-                  disabled={buildingCatalog}
-                  style={{ padding: "4px 8px", fontSize: 11, borderRadius: 6, border: "1px solid #ddd", fontWeight: 700 }}
-                >
-                  Force rebuild
-                </button>
-                <button
-                  type="button"
-                  onClick={handleRefreshQuotas}
-                  disabled={refreshingQuotas || selectedCourses.length === 0}
-                  style={{ padding: "4px 8px", fontSize: 11, borderRadius: 6, border: "1px solid #ddd", fontWeight: 700 }}
-                >
-                  {refreshingQuotas ? "Refreshing..." : "Refresh quotas (selected)"}
-                </button>
-              </div>
-            </div>
-            {catalogError && <div style={{ marginTop: 6, color: "crimson", whiteSpace: "pre-wrap" }}>{catalogError}</div>}
-            {catalogActionError && <div style={{ marginTop: 6, color: "crimson", whiteSpace: "pre-wrap" }}>{catalogActionError}</div>}
-          </div>
-
           <CoursePicker
             term={term}
-            catalogReady={catalogReady}
             selected={selectedCourses}
             setSelected={setSelectedCourses}
           />
@@ -523,7 +430,7 @@ export default function Home() {
             Prefer compact days (fewer gaps)
           </label>
 
-          <button onClick={runOptimize} disabled={loading} style={{ marginTop: 12, width: "100%", padding: "10px 12px", fontWeight: 700 }}>
+          <button onClick={runOptimize} disabled={loading || selectedCourses.length === 0} style={{ marginTop: 12, width: "100%", padding: "10px 12px", fontWeight: 700 }}>
             {loading ? "Optimizing..." : "Optimize"}
           </button>
 
@@ -544,13 +451,13 @@ export default function Home() {
 
           {/* Schedule cards */}
           <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 12 }}>
-            {result.results.map((r: any, i: number) => {
+            {result.results.map((r, i: number) => {
               const ms = flattenSchedule(r.schedule);
               const stats = computeStatsFromMeetings(ms);
 
               const isActive = i === activeIdx;
-              const penalties = (r.breakdown?.penalties ?? []) as any[];
-              const bonuses = (r.breakdown?.bonuses ?? []) as any[];
+              const penalties = (r.breakdown?.penalties ?? []) as { type: string; day?: string; cutoff?: string; minutes?: number }[];
+              const bonuses = (r.breakdown?.bonuses ?? []) as { type: string; value?: number }[];
 
               return (
                 <div
@@ -613,7 +520,7 @@ export default function Home() {
 
                   {/* quick breakdown chips */}
                   <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 6 }}>
-                    {penalties.slice(0, 3).map((p: any, idx: number) => (
+                    {penalties.slice(0, 3).map((p, idx: number) => (
                       <span
                         key={`p-${idx}`}
                         style={{
@@ -628,7 +535,7 @@ export default function Home() {
                         ❌ {penaltyLabel(p)}
                       </span>
                     ))}
-                    {bonuses.slice(0, 2).map((b: any, idx: number) => (
+                    {bonuses.slice(0, 2).map((b, idx: number) => (
                       <span
                         key={`b-${idx}`}
                         style={{
@@ -653,12 +560,12 @@ export default function Home() {
           </div>
 
           <div style={{ marginTop: 8, display: "flex", gap: 12, flexWrap: "wrap" }}>
-            <div style={{ fontWeight: 700 }}>Score: {active.score.toFixed(1)}</div>
+            <div style={{ fontWeight: 700 }}>Score: {active?.score.toFixed(1)}</div>
             <div style={{ fontSize: 13, color: "#555" }}>
-              {active.breakdown.penalties?.map((p: any, idx: number) => (
+              {(active?.breakdown?.penalties as { type: string }[] | undefined)?.map((p, idx: number) => (
                 <span key={idx} style={{ marginRight: 8 }}>❌ {p.type}</span>
               ))}
-              {active.breakdown.bonuses?.map((b: any, idx: number) => (
+              {(active?.breakdown?.bonuses as { type: string }[] | undefined)?.map((b, idx: number) => (
                 <span key={idx} style={{ marginRight: 8 }}>✅ {b.type}</span>
               ))}
             </div>
