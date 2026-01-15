@@ -1,9 +1,10 @@
 from __future__ import annotations
 from dataclasses import dataclass
+import re
 from typing import List, Dict, Any, Optional
 
 from models import Course, Section
-from section_utils import section_type, group_key
+from section_utils import section_type
 
 
 @dataclass
@@ -19,6 +20,12 @@ class MatchingConstraint:
     matching_type: Optional[str] = None  # "lab" | "tutorial" | "both" | None
 
 
+def section_num(code: str) -> str | None:
+    """Extract the first numeric group from a section code (e.g., L1 -> '1', T1A -> '1')."""
+    m = re.search(r"(\d+)", code)
+    return m.group(1) if m else None
+
+
 def build_bundles(
     course: Course, 
     constraint: Optional[MatchingConstraint] = None
@@ -32,8 +39,7 @@ def build_bundles(
     - If matching_type is "both": both constraints apply
     
     If no constraint or matching_required is False:
-    - Try to pair by group_key (best effort)
-    - Fall back to all combinations if no pairing info
+    - Allow full cartesian pairing across lectures/labs/tutorials
     """
     lecs, tuts, labs, oth = [], [], [], []
     for s in course.sections:
@@ -60,67 +66,54 @@ def build_bundles(
     need_lab = len(labs) > 0
 
     # Check if strict matching is required
-    strict_matching = constraint and constraint.matching_required
+    strict_matching = bool(constraint and constraint.matching_required)
     match_lab = strict_matching and constraint.matching_type in ("lab", "both")
     match_tutorial = strict_matching and constraint.matching_type in ("tutorial", "both")
 
     bundles: List[Bundle] = []
 
-    # Build section maps by group key
-    tuts_by_key: Dict[str, List[Section]] = {}
-    for t in tuts:
-        k = group_key(t.section)
-        if k:
-            tuts_by_key.setdefault(k, []).append(t)
-
-    labs_by_key: Dict[str, List[Section]] = {}
-    for lb in labs:
-        k = group_key(lb.section)
-        if k:
-            labs_by_key.setdefault(k, []).append(lb)
-
     for lec in lecs:
-        lec_key = group_key(lec.section)
-        
-        # Determine which tutorials can pair with this lecture
-        if need_tut:
-            if match_tutorial and lec_key:
-                # Strict matching: only tutorials with same number
-                candidate_tuts = tuts_by_key.get(lec_key, [])
-            else:
-                # Best effort: prefer matching key, but allow all if no match
-                candidate_tuts = tuts_by_key.get(lec_key, []) if lec_key else []
-                if not candidate_tuts:
-                    candidate_tuts = tuts
-        else:
-            candidate_tuts = [None]
-        
-        for tut in candidate_tuts:
-            tut_key = group_key(tut.section) if tut else None
-            
-            # Determine which labs can pair with this lecture/tutorial
-            if need_lab:
-                if match_lab and lec_key:
-                    # Strict matching: only labs with same number as lecture
-                    candidate_labs = labs_by_key.get(lec_key, [])
+        lec_num = section_num(lec.section)
+
+        if strict_matching:
+            # Strict matching: filter by numeric part when required
+            if need_tut:
+                if match_tutorial and lec_num:
+                    candidate_tuts = [t for t in tuts if section_num(t.section) == lec_num]
                 else:
-                    # Best effort: prefer matching key (tutorial > lecture), then all
-                    if tut_key and tut_key in labs_by_key:
-                        candidate_labs = labs_by_key[tut_key]
-                    elif lec_key and lec_key in labs_by_key:
-                        candidate_labs = labs_by_key[lec_key]
+                    candidate_tuts = tuts
+            else:
+                candidate_tuts = [None]
+
+            for tut in candidate_tuts:
+                if need_lab:
+                    if match_lab and lec_num:
+                        candidate_labs = [l for l in labs if section_num(l.section) == lec_num]
                     else:
                         candidate_labs = labs
-            else:
-                candidate_labs = [None]
+                else:
+                    candidate_labs = [None]
 
-            for lab in candidate_labs:
-                parts = [lec]
-                if tut:
-                    parts.append(tut)
-                if lab:
-                    parts.append(lab)
-                bundles.append(Bundle(course.course_code, parts))
+                for lab in candidate_labs:
+                    parts = [lec]
+                    if tut:
+                        parts.append(tut)
+                    if lab:
+                        parts.append(lab)
+                    bundles.append(Bundle(course.course_code, parts))
+        else:
+            # Non-matching: allow full cartesian pairing
+            candidate_tuts = tuts if need_tut else [None]
+            candidate_labs = labs if need_lab else [None]
+
+            for tut in candidate_tuts:
+                for lab in candidate_labs:
+                    parts = [lec]
+                    if tut:
+                        parts.append(tut)
+                    if lab:
+                        parts.append(lab)
+                    bundles.append(Bundle(course.course_code, parts))
 
     # If strict matching resulted in no bundles, log warning (shouldn't happen with valid data)
     if not bundles and strict_matching:

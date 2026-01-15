@@ -33,7 +33,8 @@ from wcq_subjects import list_subjects
 
 from catalog_state import load_state
 
-from mini_catalog import load_mini_catalog
+from mini_catalog import load_mini_catalog, normalize_code
+from section_utils import section_type
 
 app = FastAPI()
 
@@ -109,12 +110,28 @@ def _load_courses_with_cache(
     return course_map, sorted(subjects_to_fetch), cache_misses
 
 
-def _get_matching_constraint(mini_catalog: Dict[str, Any], course_code: str) -> MatchingConstraint:
+def _get_matching_constraint(
+    mini_catalog: Dict[str, Any],
+    course_code: str,
+    missing_catalog_entries: list[str],
+    used_matching_rules: Dict[str, Dict[str, Any]],
+) -> MatchingConstraint:
     """Get matching constraint for a course from mini-catalog."""
-    entry = mini_catalog.get(course_code, {})
+    normalized = normalize_code(course_code)
+    entry = mini_catalog.get(normalized)
+    if not entry:
+        missing_catalog_entries.append(course_code)
+        rule = {"matching_required": False, "matching_type": None}
+    else:
+        rule = {
+            "matching_required": bool(entry.get("matching_required", False)),
+            "matching_type": entry.get("matching_type"),
+        }
+
+    used_matching_rules[course_code] = rule
     return MatchingConstraint(
-        matching_required=entry.get("matching_required", False),
-        matching_type=entry.get("matching_type")
+        matching_required=rule["matching_required"],
+        matching_type=rule["matching_type"],
     )
 
 
@@ -193,13 +210,22 @@ def optimize_ranked(req: OptimizeRankedRequest):
         }
 
     # Load mini-catalog for matching constraints
-    mini_catalog = load_mini_catalog(req.term)
-    missing_catalog_entries = [cc for cc in req.course_codes if cc not in mini_catalog]
+    try:
+        mini_catalog = load_mini_catalog(req.term)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    missing_catalog_entries: list[str] = []
+    used_matching_rules: Dict[str, Dict[str, Any]] = {}
 
     choices = []
     for cc in req.course_codes:
         course = course_map[cc]
-        constraint = _get_matching_constraint(mini_catalog, cc)
+        constraint = _get_matching_constraint(
+            mini_catalog,
+            cc,
+            missing_catalog_entries,
+            used_matching_rules,
+        )
         bundles = build_bundles(course, constraint)
         choices.append(BundleChoice(course_code=cc, bundles=[b.parts for b in bundles]))
 
@@ -241,12 +267,11 @@ def optimize_ranked(req: OptimizeRankedRequest):
         ],
     }
     
-    # Add warning if some courses aren't in mini-catalog
-    if missing_catalog_entries:
-        result["_warnings"] = {
-            "missing_catalog_entries": missing_catalog_entries,
-            "note": "These courses used default matching rules (no constraints)"
-        }
+    # Add meta for debugging
+    result["_meta"] = {
+        "used_matching_rules": used_matching_rules,
+        "missing_catalog_entries": missing_catalog_entries,
+    }
     
     return result
 
@@ -326,13 +351,22 @@ def optimize_bundles(req: OptimizeBasicRequest):
         }
 
     # Load mini-catalog for matching constraints
-    mini_catalog = load_mini_catalog(req.term)
-    missing_catalog_entries = [cc for cc in req.course_codes if cc not in mini_catalog]
+    try:
+        mini_catalog = load_mini_catalog(req.term)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    missing_catalog_entries: list[str] = []
+    used_matching_rules: Dict[str, Dict[str, Any]] = {}
 
     choices = []
     for cc in req.course_codes:
         course = course_map[cc]
-        constraint = _get_matching_constraint(mini_catalog, cc)
+        constraint = _get_matching_constraint(
+            mini_catalog,
+            cc,
+            missing_catalog_entries,
+            used_matching_rules,
+        )
         bundles = build_bundles(course, constraint)
         if not bundles:
             return {"ok": False, "error": f"No bundle options found for {cc}"}
@@ -353,12 +387,11 @@ def optimize_bundles(req: OptimizeBasicRequest):
         "solutions": [schedule_to_json_bundles(sol) for sol in solutions],
     }
     
-    # Add warning if some courses aren't in mini-catalog
-    if missing_catalog_entries:
-        result["_warnings"] = {
-            "missing_catalog_entries": missing_catalog_entries,
-            "note": "These courses used default matching rules (no constraints)"
-        }
+    # Add meta for debugging
+    result["_meta"] = {
+        "used_matching_rules": used_matching_rules,
+        "missing_catalog_entries": missing_catalog_entries,
+    }
     
     return result
 
@@ -366,6 +399,58 @@ def optimize_bundles(req: OptimizeBasicRequest):
 @app.get("/health")
 def health():
     return {"ok": True}
+
+@app.get("/debug/bundles")
+def debug_bundles(term: str = Query(...), course_code: str = Query(...), refresh: int = 0):
+    course_map, subjects_fetched, cache_misses = _load_courses_with_cache(
+        term, [course_code], refresh=bool(refresh), use_cache=True
+    )
+    course = course_map.get(course_code)
+    if not course:
+        return {
+            "ok": False,
+            "error": "Course code not found",
+            "missing": [course_code],
+            "subjects_fetched": subjects_fetched,
+            "cache_misses": cache_misses,
+        }
+
+    try:
+        mini_catalog = load_mini_catalog(term)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    missing_catalog_entries: list[str] = []
+    used_matching_rules: Dict[str, Dict[str, Any]] = {}
+    constraint = _get_matching_constraint(
+        mini_catalog,
+        course_code,
+        missing_catalog_entries,
+        used_matching_rules,
+    )
+
+    bundles = build_bundles(course, constraint)
+    lectures = [s for s in course.sections if section_type(s.section) == "LEC"]
+    labs = [s for s in course.sections if section_type(s.section) == "LAB"]
+    tutorials = [s for s in course.sections if section_type(s.section) == "TUT"]
+
+    return {
+        "ok": True,
+        "course_code": course_code,
+        "matching_rule": used_matching_rules.get(course_code),
+        "counts": {
+            "lectures": len(lectures),
+            "labs": len(labs),
+            "tutorials": len(tutorials),
+            "bundles": len(bundles),
+        },
+        "bundle_samples": [[p.section for p in b.parts] for b in bundles[:10]],
+        "_meta": {
+            "missing_catalog_entries": missing_catalog_entries,
+            "subjects_fetched": subjects_fetched,
+            "cache_misses": cache_misses,
+        },
+    }
 
 @app.get("/wcq/raw")
 def wcq_raw(term: str = Query(...), subject: str = Query(...), refresh: int = 0):
