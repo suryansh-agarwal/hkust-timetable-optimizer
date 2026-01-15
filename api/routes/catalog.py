@@ -18,11 +18,13 @@ from catalog_store import (
     write_index,
 )
 from wcq_service import load_subject_payload
+from wcq_subjects import list_subjects
 
 
 router = APIRouter(prefix="/catalog", tags=["catalog"])
 
 FRESH_MAX_AGE_SEC = 12 * 60 * 60
+SUBJECTS_CACHE_MAX_AGE_SEC = 12 * 60 * 60
 
 
 class BuildCatalogRequest(BaseModel):
@@ -38,6 +40,29 @@ class RefreshQuotasRequest(BaseModel):
 
 
 def get_all_subjects(term: str) -> list[str]:
+    # Prefer cached live WCQ subject list so builds include all current subjects.
+    live_cache_path = STATIC_DIR / f"subjects_{term}.json"
+    if live_cache_path.exists():
+        try:
+            data = json.loads(live_cache_path.read_text(encoding="utf-8"))
+            if (
+                isinstance(data, dict)
+                and is_fresh(data.get("fetched_at"), SUBJECTS_CACHE_MAX_AGE_SEC)
+                and isinstance(data.get("subjects"), list)
+            ):
+                return [str(s).upper() for s in data["subjects"] if str(s).strip()]
+        except Exception:
+            pass
+
+    try:
+        live_subjects = list_subjects(term)
+        if live_subjects:
+            payload = {"fetched_at": time.time(), "subjects": live_subjects}
+            live_cache_path.write_text(json.dumps(payload), encoding="utf-8")
+            return [str(s).upper() for s in live_subjects if str(s).strip()]
+    except Exception:
+        pass
+
     subjects_path = STATIC_DIR / "subjects.json"
     if subjects_path.exists():
         try:

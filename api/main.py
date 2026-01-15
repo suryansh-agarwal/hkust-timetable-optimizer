@@ -29,7 +29,7 @@ from optimizer_bundles import BundleChoice, find_bundle_schedules, schedule_to_j
 
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.wcq_subjects import list_subjects
+from wcq_subjects import list_subjects
 
 app = FastAPI()
 
