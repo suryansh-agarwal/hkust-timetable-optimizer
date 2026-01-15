@@ -1,0 +1,121 @@
+# =========================
+# Root .gitignore (api + web)
+# =========================
+
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# -------------------------
+# OS / misc
+# -------------------------
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+Thumbs.db
+
+# -------------------------
+# IDEs / editors
+# -------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Cursor / tooling caches (safe to ignore)
+.cursor/
+.cursor-cache/
+.history/
+
+# -------------------------
+# ENV files (opt-in if needed)
+# -------------------------
+.env*
+!.env.example
+
+# -------------------------
+# Logs
+# -------------------------
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+*.log
+
+# -------------------------
+# Node / JS
+# -------------------------
+node_modules/
+.pnp
+.pnp.*
+.pnpm-store/
+
+# Yarn (Berry) - keep the parts you commit
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+!.yarn/sdks
+
+# Testing / coverage
+coverage/
+
+# Next.js
+.next/
+out/
+
+# Production builds
+build/
+dist/
+
+# Vercel
+.vercel/
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# -------------------------
+# Python
+# -------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Packaging / build
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Test / lint caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+noxfile.py
+
+# Jupyter
+.ipynb_checkpoints/
+
+# -------------------------
+# API / project-specific caches
+# -------------------------
+# Your scraper/cache folder (based on your commit output)
+api/.cache_wcq/
+
+# Compiled python output in api (if any slips through)
+api/**/__pycache__/
+api/**/*.pyc
+
+# If you generate local data artifacts you DON'T want tracked, uncomment:
+# api/data/
