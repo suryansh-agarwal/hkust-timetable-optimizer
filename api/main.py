@@ -29,6 +29,8 @@ from optimizer_bundles import BundleChoice, find_bundle_schedules, schedule_to_j
 
 from fastapi.middleware.cors import CORSMiddleware
 
+from api.wcq_subjects import list_subjects
+
 app = FastAPI()
 
 app.add_middleware(
@@ -153,6 +155,10 @@ class OptimizeRankedRequest(BaseModel):
 def root():
     return {"status": "ok", "message": "HKUST Timetable Optimizer API is running"}
 
+
+@app.get("/wcq/subjects")
+def wcq_subjects(term: str = Query(...)):
+    return {"term": term, "subjects": list_subjects(term)}
 
 @app.post("/optimize/ranked")
 def optimize_ranked(req: OptimizeRankedRequest):

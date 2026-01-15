@@ -41,6 +41,13 @@ export async function catalogSearch(term: string, q: string, limit: number) {
   return res.json();
 }
 
+export async function listSubjects(term: string) {
+    const res = await fetch(`${API_BASE}/wcq/subjects?term=${encodeURIComponent(term)}`);
+    if (!res.ok) throw new Error(`listSubjects failed: ${res.status}`);
+    return res.json() as Promise<{ term: string; subjects: string[] }>;
+  }
+  
+
 export async function catalogBuild(term: string, force = false, max_subjects: number | null = null) {
   const res = await fetch(`${API_BASE}/catalog/build`, {
     method: "POST",
