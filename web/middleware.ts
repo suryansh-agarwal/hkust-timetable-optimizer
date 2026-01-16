@@ -1,18 +1,13 @@
-import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { createServerClient } from "@supabase/ssr";
 
-function getSupabaseKey() {
+function getKey() {
   return (
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   );
 }
 
-function getSupabaseUrl() {
-  return process.env.NEXT_PUBLIC_SUPABASE_URL;
-}
-
-// Routes that should NOT be gated
 function isPublicPath(pathname: string) {
   if (
     pathname.startsWith("/_next") ||
@@ -27,14 +22,12 @@ function isPublicPath(pathname: string) {
   );
 }
 
-export async function updateSession(request: NextRequest) {
-  const url = getSupabaseUrl();
-  const key = getSupabaseKey();
+export async function middleware(request: NextRequest) {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = getKey();
 
   if (!url || !key) {
-    throw new Error(
-      "Missing Supabase env vars: set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY"
-    );
+    return NextResponse.next();
   }
 
   let response = NextResponse.next({ request });
@@ -45,34 +38,37 @@ export async function updateSession(request: NextRequest) {
         return request.cookies.getAll();
       },
       setAll(cookiesToSet) {
+        // update request cookies
         cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+
+        // recreate response with updated request
         response = NextResponse.next({ request });
-        cookiesToSet.forEach(({ name, value, options }) =>
-          response.cookies.set(name, value, options)
-        );
+
+        // set cookies on response
+        cookiesToSet.forEach(({ name, value, options }) => {
+          response.cookies.set(name, value, options);
+        });
       },
     },
   });
 
-  // Always refresh/validate session cookies
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // DEBUG HEADER (remove later)
+  response.headers.set("x-hkust-gate", "middleware-hit");
 
   const pathname = request.nextUrl.pathname;
 
-  // Don’t gate public routes
   if (isPublicPath(pathname)) return response;
 
-  // Not logged in -> go login
+  const { data: { user } } = await supabase.auth.getUser();
+
+  // not logged in
   if (!user?.email) {
     const loginUrl = new URL("/login", request.nextUrl.origin);
-    // optional: send them back after login
     loginUrl.searchParams.set("next", pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  // Logged in but not allowlisted -> request access
+  // allowlist check
   const email = user.email.toLowerCase();
 
   const { data: allowRow } = await supabase
@@ -85,9 +81,13 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(new URL("/request-access", request.nextUrl.origin));
   }
 
-  // right before `return response;`
-  response.headers.set("x-hkust-gate", "hit");
+  response.headers.set("x-hkust-email-domain", email.split("@")[1] ?? "none");
+  response.headers.set("x-hkust-allowed", allowRow ? "yes" : "no");
 
 
   return response;
 }
+
+export const config = {
+  matcher: ["/((?!_next|.*\\..*).*)"],
+};
