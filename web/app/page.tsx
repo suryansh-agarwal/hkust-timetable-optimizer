@@ -22,14 +22,66 @@ function genNoAfterTimes(): string[] {
   return times;
 }
 
-// Time options for soft no-before (08:00–12:00 in 30-min steps)
+// Time options for soft no-before (09:00–15:00 in 30-min steps)
 function genNoBeforeTimes(): string[] {
   const times: string[] = [];
-  for (let h = 8; h <= 12; h++) {
+  for (let h = 9; h <= 15; h++) {
     times.push(`${h.toString().padStart(2, "0")}:00`);
-    if (h < 12) times.push(`${h.toString().padStart(2, "0")}:30`);
+    if (h < 15) times.push(`${h.toString().padStart(2, "0")}:30`);
   }
   return times;
+}
+
+// Convert "HH:MM" to minutes since midnight
+function timeToMinutes(hhmm: string): number {
+  const [h, m] = hhmm.split(":").map(Number);
+  return h * 60 + m;
+}
+
+// Validate that no-before and no-after constraints don't conflict on the same day
+function validateTimeConstraints(
+  hardNoBefore: Record<string, { enabled: boolean; time: string }>,
+  hardNoAfter: Record<string, { enabled: boolean; time: string }>,
+  softNoBefore: Record<string, { enabled: boolean; time: string }>,
+  softNoAfter: Record<string, { enabled: boolean; time: string }>,
+  days: readonly string[]
+): string[] {
+  const conflicts: string[] = [];
+
+  for (const d of days) {
+    // Collect all no-before times for this day (both hard and soft)
+    const noBeforeTimes: { type: string; time: number }[] = [];
+    if (hardNoBefore[d]?.enabled) {
+      noBeforeTimes.push({ type: "hard", time: timeToMinutes(hardNoBefore[d].time) });
+    }
+    if (softNoBefore[d]?.enabled) {
+      noBeforeTimes.push({ type: "soft", time: timeToMinutes(softNoBefore[d].time) });
+    }
+
+    // Collect all no-after times for this day (both hard and soft)
+    const noAfterTimes: { type: string; time: number }[] = [];
+    if (hardNoAfter[d]?.enabled) {
+      noAfterTimes.push({ type: "hard", time: timeToMinutes(hardNoAfter[d].time) });
+    }
+    if (softNoAfter[d]?.enabled) {
+      noAfterTimes.push({ type: "soft", time: timeToMinutes(softNoAfter[d].time) });
+    }
+
+    // Check for conflicts: if no-before >= no-after, it's impossible
+    for (const nb of noBeforeTimes) {
+      for (const na of noAfterTimes) {
+        if (nb.time >= na.time) {
+          const nbTimeStr = hardNoBefore[d]?.enabled && nb.type === "hard" ? hardNoBefore[d].time : softNoBefore[d].time;
+          const naTimeStr = hardNoAfter[d]?.enabled && na.type === "hard" ? hardNoAfter[d].time : softNoAfter[d].time;
+          conflicts.push(
+            `${d}: "no classes before ${nbTimeStr}" (${nb.type}) conflicts with "no classes after ${naTimeStr}" (${na.type})`
+          );
+        }
+      }
+    }
+  }
+
+  return conflicts;
 }
 
 const NO_AFTER_TIMES = genNoAfterTimes();
@@ -236,10 +288,18 @@ export default function Home() {
   const meetingsB = useMemo(() => (pinnedB ? flattenSchedule(pinnedB.schedule) : []), [pinnedB]);
 
   async function runOptimize() {
-    setLoading(true);
     setError("");
     setResult(null);
     setActiveIdx(0);
+
+    // Validate time constraints before running
+    const conflicts = validateTimeConstraints(hardNoBefore, hardNoAfter, softNoBefore, softNoAfter, DAYS);
+    if (conflicts.length > 0) {
+      setError(`Conflicting time preferences detected:\n${conflicts.join("\n")}\n\nPlease adjust your preferences so that "no classes before" times are earlier than "no classes after" times for the same day.`);
+      return;
+    }
+
+    setLoading(true);
 
     // Build hard_no_after from enabled days only
     const hardNoAfterPayload: Record<string, string> = {};
