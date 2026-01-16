@@ -145,6 +145,7 @@ class Preferences(BaseModel):
     # Hard constraints
     hard_free_days: List[str] = Field(default_factory=list)  # e.g. ["Tu"]
     hard_no_after: Dict[str, str] = Field(default_factory=dict)  # e.g. {"Fr": "15:00"}
+    hard_no_before: Dict[str, str] = Field(default_factory=dict)  # e.g. {"Mo": "09:00"}
 
     # Soft preferences (penalties)
     soft_free_days: List[str] = Field(default_factory=list)
@@ -165,7 +166,7 @@ class Preferences(BaseModel):
 
     @model_validator(mode="after")
     def validate_day_time_dicts(self):
-        for name in ("hard_no_after", "soft_no_after", "soft_no_before"):
+        for name in ("hard_no_after", "hard_no_before", "soft_no_after", "soft_no_before"):
             d = getattr(self, name)
             for day, time in d.items():
                 _validate_day(day)

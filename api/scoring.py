@@ -35,6 +35,10 @@ def violates_no_after(meetings, day: str, cutoff_min: int) -> bool:
     # violation if any class starts OR ends after cutoff (choose stricter end-based)
     return any(m["day"] == day and m["end_min"] > cutoff_min for m in meetings)
 
+def violates_no_before(meetings, day: str, cutoff_min: int) -> bool:
+    # violation if any class starts before cutoff
+    return any(m["day"] == day and m["start_min"] < cutoff_min for m in meetings)
+
 def gaps_penalty(meetings) -> int:
     # sum of idle minutes between classes on same day (penalty)
     penalty = 0
@@ -99,6 +103,19 @@ def score_schedule(schedule: Dict[str, List[Section]], prefs) -> Tuple[float, Di
             breakdown["rejected"] = True
             breakdown["penalties"].append({
                 "type": "hard_no_after_violation",
+                "day": d,
+                "cutoff": hhmm,
+                "value": -999999,
+            })
+            return -1e9, breakdown
+
+    # Hard no-before cutoffs
+    for d, hhmm in prefs.hard_no_before.items():
+        cut = hhmm_to_min(hhmm)
+        if violates_no_before(ms, d, cut):
+            breakdown["rejected"] = True
+            breakdown["penalties"].append({
+                "type": "hard_no_before_violation",
                 "day": d,
                 "cutoff": hhmm,
                 "value": -999999,

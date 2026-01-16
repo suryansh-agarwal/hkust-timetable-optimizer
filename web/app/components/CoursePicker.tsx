@@ -152,37 +152,61 @@ export function CoursePicker(props: Readonly<{
 
       {/* search */}
       <div style={{ marginTop: 14 }}>
-        <div style={{ fontSize: 13, color: "#666", marginBottom: 6 }}>Search course code or title</div>
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder='Search (e.g. "FINA 2303" or "econometrics")'
-          disabled={!indexReady}
-          style={{ padding: 8, width: "100%" }}
-        />
-      </div>
+        <div style={{ fontSize: 13, color: "#666", marginBottom: 6 }}>Search and add courses</div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            border: "1px solid #ddd",
+            borderRadius: 10,
+            padding: "8px 10px",
+            background: indexReady ? "white" : "#f7f7f7",
+          }}
+        >
+          <span style={{ fontSize: 14, color: "#666" }}>🔎</span>
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder='Type a course code or title (e.g. "FINA 2303", "econometrics")'
+            disabled={!indexReady}
+            style={{ border: "none", outline: "none", width: "100%", background: "transparent" }}
+          />
+        </div>
+        <div style={{ marginTop: 6, fontSize: 12, color: "#888" }}>
+          Tip: Use course codes for the fastest results.
+        </div>
 
-      {/* list */}
-      <div style={{ marginTop: 10, maxHeight: 320, overflow: "auto", border: "1px solid #eee", borderRadius: 10 }}>
-        {!indexReady && !indexStatus.error && !indexLoading && (
-          <div style={{ padding: 12, color: "#999" }}>
-            Index not loaded yet.
-          </div>
-        )}
-        {indexLoading && (
-          <div style={{ padding: 12, color: "#777" }}>Loading course index...</div>
-        )}
-        {indexReady && q.trim() === "" && (
-          <div style={{ padding: 12, color: "#999" }}>
-            Start typing to search courses.
-          </div>
-        )}
-        {indexReady && q.trim() !== "" && results.length === 0 && (
-          <div style={{ padding: 12, color: "#999" }}>
-            No results found.
-          </div>
-        )}
-        {indexReady && results.map((c) => {
+        {/* list */}
+        <div
+          style={{
+            marginTop: 10,
+            maxHeight: 320,
+            overflow: "auto",
+            border: "1px solid #eee",
+            borderRadius: 10,
+            background: "white",
+          }}
+        >
+          {!indexReady && !indexStatus.error && !indexLoading && (
+            <div style={{ padding: 12, color: "#999" }}>
+              Index not loaded yet.
+            </div>
+          )}
+          {indexLoading && (
+            <div style={{ padding: 12, color: "#777" }}>Loading course index...</div>
+          )}
+          {indexReady && q.trim() === "" && (
+            <div style={{ padding: 12, color: "#999" }}>
+              Start typing to search courses.
+            </div>
+          )}
+          {indexReady && q.trim() !== "" && results.length === 0 && (
+            <div style={{ padding: 12, color: "#999" }}>
+              No results found.
+            </div>
+          )}
+          {indexReady && results.map((c) => {
           const on = selected.includes(c.course_code);
           
           // Compute matching label based on matching_type
@@ -238,6 +262,7 @@ export function CoursePicker(props: Readonly<{
             </div>
           );
         })}
+        </div>
       </div>
     </div>
   );

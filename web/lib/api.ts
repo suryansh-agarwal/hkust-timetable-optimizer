@@ -126,6 +126,7 @@ export function searchCourseIndex(
 export type Prefs = {
   hard_free_days?: string[];
   hard_no_after?: Record<string, string>;
+  hard_no_before?: Record<string, string>;
   soft_free_days?: string[];
   soft_no_after?: Record<string, string>;
   soft_no_before?: Record<string, string>;

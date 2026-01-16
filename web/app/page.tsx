@@ -7,7 +7,10 @@ import { CoursePicker } from "./components/CoursePicker";
 
 
 const DAYS = ["Mo", "Tu", "We", "Th", "Fr"] as const;
-const TERMS = ["2540","2530", "2520", "2510"] as const;
+const TERM_OPTIONS = [
+  { value: "2530", label: "2025 Spring" },
+  { value: "2540", label: "2025 Summer" },
+] as const;
 
 // Time options for soft no-after (12:00–20:00 in 30-min steps)
 function genNoAfterTimes(): string[] {
@@ -53,6 +56,7 @@ type Pinned = {
   id: string;
   name: string;
   term: string;
+  sourceIdx: number;
   score: number;
   breakdown: unknown;
   schedule: unknown[];
@@ -140,11 +144,27 @@ function bonusLabel(b: { type: string; value?: number }) {
 
 export default function Home() {
   const [term, setTerm] = useState("2530");
+  const [showHelp, setShowHelp] = useState(true);
 
   const [selectedCourses, setSelectedCourses] = useState<string[]>(["COMP 2011", "ECON 3334", "MATH 2350"]);
 
   // Hard free days (multi-select)
   const [hardFreeDays, setHardFreeDays] = useState<string[]>([]);
+  const [softFreeDays, setSoftFreeDays] = useState<string[]>([]);
+
+  // Per-day hard no-after constraints
+  const [hardNoAfter, setHardNoAfter] = useState<Record<string, SoftDayPref>>(() => {
+    const init: Record<string, SoftDayPref> = {};
+    for (const d of DAYS) init[d] = { enabled: false, time: "15:00" };
+    return init;
+  });
+
+  // Per-day hard no-before constraints
+  const [hardNoBefore, setHardNoBefore] = useState<Record<string, SoftDayPref>>(() => {
+    const init: Record<string, SoftDayPref> = {};
+    for (const d of DAYS) init[d] = { enabled: false, time: "09:00" };
+    return init;
+  });
 
   // Per-day soft no-after constraints
   const [softNoAfter, setSoftNoAfter] = useState<Record<string, SoftDayPref>>(() => {
@@ -183,12 +203,14 @@ export default function Home() {
   };
 
   function pinResultOption(r: { score: number; breakdown: unknown; schedule: unknown[] }, idx: number) {
+    if (pinned.some((p) => p.term === term && p.sourceIdx === idx)) return;
     const id = makePinId();
     const name = `Pinned #${pinned.length + 1} (Opt ${idx + 1})`;
     const item: Pinned = {
       id,
       name,
       term,
+      sourceIdx: idx,
       score: r.score,
       breakdown: r.breakdown,
       schedule: r.schedule,
@@ -219,6 +241,22 @@ export default function Home() {
     setResult(null);
     setActiveIdx(0);
 
+    // Build hard_no_after from enabled days only
+    const hardNoAfterPayload: Record<string, string> = {};
+    for (const d of DAYS) {
+      if (hardNoAfter[d].enabled) {
+        hardNoAfterPayload[d] = hardNoAfter[d].time;
+      }
+    }
+
+    // Build hard_no_before from enabled days only
+    const hardNoBeforePayload: Record<string, string> = {};
+    for (const d of DAYS) {
+      if (hardNoBefore[d].enabled) {
+        hardNoBeforePayload[d] = hardNoBefore[d].time;
+      }
+    }
+
     // Build soft_no_after from enabled days only
     const softNoAfterPayload: Record<string, string> = {};
     for (const d of DAYS) {
@@ -239,6 +277,9 @@ export default function Home() {
       prefer_one_free_day: preferOneFreeDay,
       compact_days: compactDays,
       hard_free_days: hardFreeDays,
+      hard_no_after: hardNoAfterPayload,
+      hard_no_before: hardNoBeforePayload,
+      soft_free_days: softFreeDays,
       soft_no_after: softNoAfterPayload,
       soft_no_before: softNoBeforePayload,
       weights: {
@@ -263,8 +304,30 @@ export default function Home() {
   const meetings = useMemo(() => (active ? flattenSchedule(active.schedule) : []), [active]);
 
   return (
-    <div style={{ maxWidth: 980, margin: "0 auto", padding: 16, fontFamily: "system-ui" }}>
-      <h1 style={{ fontSize: 28, fontWeight: 700 }}>HKUST Timetable Optimizer</h1>
+    <div style={{ maxWidth: 1200, margin: "0 auto", padding: "20px 24px", fontFamily: "system-ui", width: "100%" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        <div>
+          <h1 style={{ fontSize: 28, fontWeight: 700, margin: 0 }}>HKUST Timetable Optimizer</h1>
+          <div style={{ marginTop: 4, fontSize: 13, color: "#666" }}>
+            Build a schedule with soft and hard preferences
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowHelp(true)}
+          style={{
+            border: "1px solid #ddd",
+            background: "white",
+            borderRadius: 10,
+            padding: "8px 12px",
+            fontSize: 13,
+            fontWeight: 700,
+            cursor: "pointer",
+          }}
+        >
+          How to use?
+        </button>
+      </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
         <div style={{ border: "1px solid #ddd", borderRadius: 12, padding: 14 }}>
@@ -278,9 +341,9 @@ export default function Home() {
               onChange={(e) => handleTermChange(e.target.value)}
               style={{ padding: 8, width: "100%" }}
             >
-              {TERMS.map((t) => (
-                <option key={t} value={t}>
-                  {t}
+              {TERM_OPTIONS.map((t) => (
+                <option key={t.value} value={t.value}>
+                  {t.label}
                 </option>
               ))}
             </select>
@@ -299,117 +362,217 @@ export default function Home() {
         <div style={{ border: "1px solid #ddd", borderRadius: 12, padding: 14, maxHeight: 520, overflowY: "auto" }}>
           <h2 style={{ fontSize: 18, fontWeight: 600 }}>Preferences</h2>
 
-          {/* Hard Free Days (multi-select) */}
-          <div style={{ marginTop: 10 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Must be free (hard)</div>
-            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-              {DAYS.map((d) => (
-                <label key={d} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13 }}>
-                  <input
-                    type="checkbox"
-                    checked={hardFreeDays.includes(d)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setHardFreeDays([...hardFreeDays, d]);
-                      } else {
-                        setHardFreeDays(hardFreeDays.filter((x) => x !== d));
-                      }
-                    }}
-                  />
-                  {d}
-                </label>
-              ))}
-            </div>
-          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 10 }}>
+            <div style={{ border: "1px solid #eee", borderRadius: 10, padding: 12, background: "#fafafa" }}>
+              <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>Hard constraints</div>
 
-          {/* Soft No Classes After */}
-          <div style={{ marginTop: 14 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Soft: no classes after</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {DAYS.map((d) => (
-                <div key={d} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-                  <label style={{ display: "flex", alignItems: "center", gap: 4, width: 50 }}>
-                    <input
-                      type="checkbox"
-                      checked={softNoAfter[d].enabled}
-                      onChange={(e) =>
-                        setSoftNoAfter({ ...softNoAfter, [d]: { ...softNoAfter[d], enabled: e.target.checked } })
-                      }
-                    />
-                    {d}
-                  </label>
-                  <select
-                    value={softNoAfter[d].time}
-                    disabled={!softNoAfter[d].enabled}
-                    onChange={(e) =>
-                      setSoftNoAfter({ ...softNoAfter, [d]: { ...softNoAfter[d], time: e.target.value } })
-                    }
-                    style={{ padding: 4, fontSize: 12, borderRadius: 4, opacity: softNoAfter[d].enabled ? 1 : 0.5 }}
-                  >
-                    {NO_AFTER_TIMES.map((t) => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
-                  </select>
+              {/* Hard Free Days (multi-select) */}
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Must be free</div>
+                <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                  {DAYS.map((d) => (
+                    <label key={d} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13 }}>
+                      <input
+                        type="checkbox"
+                        checked={hardFreeDays.includes(d)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setHardFreeDays([...hardFreeDays, d]);
+                          } else {
+                            setHardFreeDays(hardFreeDays.filter((x) => x !== d));
+                          }
+                        }}
+                      />
+                      {d}
+                    </label>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </div>
+              </div>
 
-          {/* Soft No Classes Before */}
-          <div style={{ marginTop: 14 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Soft: no classes before</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {DAYS.map((d) => (
-                <div key={d} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-                  <label style={{ display: "flex", alignItems: "center", gap: 4, width: 50 }}>
-                    <input
-                      type="checkbox"
-                      checked={softNoBefore[d].enabled}
-                      onChange={(e) =>
-                        setSoftNoBefore({ ...softNoBefore, [d]: { ...softNoBefore[d], enabled: e.target.checked } })
-                      }
-                    />
-                    {d}
-                  </label>
-                  <select
-                    value={softNoBefore[d].time}
-                    disabled={!softNoBefore[d].enabled}
-                    onChange={(e) =>
-                      setSoftNoBefore({ ...softNoBefore, [d]: { ...softNoBefore[d], time: e.target.value } })
-                    }
-                    style={{ padding: 4, fontSize: 12, borderRadius: 4, opacity: softNoBefore[d].enabled ? 1 : 0.5 }}
-                  >
-                    {NO_BEFORE_TIMES.map((t) => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
-                  </select>
+              {/* Hard No Classes After */}
+              <div style={{ marginTop: 14 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>No classes after</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {DAYS.map((d) => (
+                    <div key={d} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+                      <label style={{ display: "flex", alignItems: "center", gap: 4, width: 50 }}>
+                        <input
+                          type="checkbox"
+                          checked={hardNoAfter[d].enabled}
+                          onChange={(e) =>
+                            setHardNoAfter({ ...hardNoAfter, [d]: { ...hardNoAfter[d], enabled: e.target.checked } })
+                          }
+                        />
+                        {d}
+                      </label>
+                      <select
+                        value={hardNoAfter[d].time}
+                        disabled={!hardNoAfter[d].enabled}
+                        onChange={(e) =>
+                          setHardNoAfter({ ...hardNoAfter, [d]: { ...hardNoAfter[d], time: e.target.value } })
+                        }
+                        style={{ padding: 4, fontSize: 12, borderRadius: 4, opacity: hardNoAfter[d].enabled ? 1 : 0.5 }}
+                      >
+                        {NO_AFTER_TIMES.map((t) => (
+                          <option key={t} value={t}>{t}</option>
+                        ))}
+                      </select>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              </div>
+
+              {/* Hard No Classes Before */}
+              <div style={{ marginTop: 14 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>No classes before</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {DAYS.map((d) => (
+                    <div key={d} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+                      <label style={{ display: "flex", alignItems: "center", gap: 4, width: 50 }}>
+                        <input
+                          type="checkbox"
+                          checked={hardNoBefore[d].enabled}
+                          onChange={(e) =>
+                            setHardNoBefore({ ...hardNoBefore, [d]: { ...hardNoBefore[d], enabled: e.target.checked } })
+                          }
+                        />
+                        {d}
+                      </label>
+                      <select
+                        value={hardNoBefore[d].time}
+                        disabled={!hardNoBefore[d].enabled}
+                        onChange={(e) =>
+                          setHardNoBefore({ ...hardNoBefore, [d]: { ...hardNoBefore[d], time: e.target.value } })
+                        }
+                        style={{ padding: 4, fontSize: 12, borderRadius: 4, opacity: hardNoBefore[d].enabled ? 1 : 0.5 }}
+                      >
+                        {NO_BEFORE_TIMES.map((t) => (
+                          <option key={t} value={t}>{t}</option>
+                        ))}
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ border: "1px solid #eee", borderRadius: 10, padding: 12 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>Soft preferences</div>
+
+              {/* Soft Free Days (multi-select) */}
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Prefer free</div>
+                <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                  {DAYS.map((d) => (
+                    <label key={d} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13 }}>
+                      <input
+                        type="checkbox"
+                        checked={softFreeDays.includes(d)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSoftFreeDays([...softFreeDays, d]);
+                          } else {
+                            setSoftFreeDays(softFreeDays.filter((x) => x !== d));
+                          }
+                        }}
+                      />
+                      {d}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Soft No Classes After */}
+              <div style={{ marginTop: 14 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>No classes after</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {DAYS.map((d) => (
+                    <div key={d} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+                      <label style={{ display: "flex", alignItems: "center", gap: 4, width: 50 }}>
+                        <input
+                          type="checkbox"
+                          checked={softNoAfter[d].enabled}
+                          onChange={(e) =>
+                            setSoftNoAfter({ ...softNoAfter, [d]: { ...softNoAfter[d], enabled: e.target.checked } })
+                          }
+                        />
+                        {d}
+                      </label>
+                      <select
+                        value={softNoAfter[d].time}
+                        disabled={!softNoAfter[d].enabled}
+                        onChange={(e) =>
+                          setSoftNoAfter({ ...softNoAfter, [d]: { ...softNoAfter[d], time: e.target.value } })
+                        }
+                        style={{ padding: 4, fontSize: 12, borderRadius: 4, opacity: softNoAfter[d].enabled ? 1 : 0.5 }}
+                      >
+                        {NO_AFTER_TIMES.map((t) => (
+                          <option key={t} value={t}>{t}</option>
+                        ))}
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Soft No Classes Before */}
+              <div style={{ marginTop: 14 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>No classes before</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {DAYS.map((d) => (
+                    <div key={d} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+                      <label style={{ display: "flex", alignItems: "center", gap: 4, width: 50 }}>
+                        <input
+                          type="checkbox"
+                          checked={softNoBefore[d].enabled}
+                          onChange={(e) =>
+                            setSoftNoBefore({ ...softNoBefore, [d]: { ...softNoBefore[d], enabled: e.target.checked } })
+                          }
+                        />
+                        {d}
+                      </label>
+                      <select
+                        value={softNoBefore[d].time}
+                        disabled={!softNoBefore[d].enabled}
+                        onChange={(e) =>
+                          setSoftNoBefore({ ...softNoBefore, [d]: { ...softNoBefore[d], time: e.target.value } })
+                        }
+                        style={{ padding: 4, fontSize: 12, borderRadius: 4, opacity: softNoBefore[d].enabled ? 1 : 0.5 }}
+                      >
+                        {NO_BEFORE_TIMES.map((t) => (
+                          <option key={t} value={t}>{t}</option>
+                        ))}
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
             </div>
           </div>
 
-          {/* Weights */}
+          {/* Weights + style prefs (outside soft box) */}
           <div style={{ marginTop: 14 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Weights</div>
+            <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>Weights & style</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#333" }}>
                 <span style={{ width: 140 }}>Gap penalty:</span>
                 <select
                   value={gapWeightPreset}
                   onChange={(e) => setGapWeightPreset(e.target.value as WeightPreset)}
-                  style={{ padding: 4, fontSize: 12, borderRadius: 4 }}
+                  style={{ padding: 6, fontSize: 13, borderRadius: 6 }}
                 >
                   <option value="Low">Low</option>
                   <option value="Med">Med</option>
                   <option value="High">High</option>
                 </select>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#333" }}>
                 <span style={{ width: 140 }}>Early/late penalty:</span>
                 <select
                   value={earlyLateWeightPreset}
                   onChange={(e) => setEarlyLateWeightPreset(e.target.value as WeightPreset)}
-                  style={{ padding: 4, fontSize: 12, borderRadius: 4 }}
+                  style={{ padding: 6, fontSize: 13, borderRadius: 6 }}
                 >
                   <option value="Low">Low</option>
                   <option value="Med">Med</option>
@@ -417,18 +580,19 @@ export default function Home() {
                 </select>
               </div>
             </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10, fontSize: 13, color: "#333" }}>
+              <label style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                <input type="checkbox" checked={preferOneFreeDay} onChange={(e) => setPreferOneFreeDay(e.target.checked)} />
+                Prefer at least one free weekday
+              </label>
+
+              <label style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                <input type="checkbox" checked={compactDays} onChange={(e) => setCompactDays(e.target.checked)} />
+                Prefer compact days (fewer gaps)
+              </label>
+            </div>
           </div>
-
-          {/* Existing boolean prefs */}
-          <label style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 14 }}>
-            <input type="checkbox" checked={preferOneFreeDay} onChange={(e) => setPreferOneFreeDay(e.target.checked)} />
-            Prefer at least one free weekday
-          </label>
-
-          <label style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 10 }}>
-            <input type="checkbox" checked={compactDays} onChange={(e) => setCompactDays(e.target.checked)} />
-            Prefer compact days (fewer gaps)
-          </label>
 
           <button onClick={runOptimize} disabled={loading || selectedCourses.length === 0} style={{ marginTop: 12, width: "100%", padding: "10px 12px", fontWeight: 700 }}>
             {loading ? "Optimizing..." : "Optimize"}
@@ -456,6 +620,7 @@ export default function Home() {
               const stats = computeStatsFromMeetings(ms);
 
               const isActive = i === activeIdx;
+              const isPinned = pinned.some((p) => p.term === term && p.sourceIdx === i);
               const penalties = (r.breakdown?.penalties ?? []) as { type: string; day?: string; cutoff?: string; minutes?: number }[];
               const bonuses = (r.breakdown?.bonuses ?? []) as { type: string; value?: number }[];
 
@@ -488,17 +653,18 @@ export default function Home() {
                           pinResultOption(r, i);
                         }}
                         style={{
-                          border: "1px solid #ddd",
-                          background: "#fafafa",
+                          border: isPinned ? "1px solid #1d4ed8" : "1px solid #ddd",
+                          background: isPinned ? "#e0ecff" : "#fafafa",
                           borderRadius: 8,
                           padding: "4px 8px",
                           fontSize: 11,
                           fontWeight: 700,
                           cursor: "pointer",
+                          color: isPinned ? "#1d4ed8" : "#111",
                         }}
-                        title="Pin this option for comparison"
+                        title={isPinned ? "Pinned" : "Pin this option for comparison"}
                       >
-                        📌 Pin
+                        {isPinned ? "✅ Pinned" : "📌 Pin"}
                       </button>
                     </div>
                   </div>
@@ -716,6 +882,100 @@ export default function Home() {
           </div>
 
         </div>
+      )}
+      {showHelp && (
+        <>
+          <button
+            type="button"
+            aria-label="Close help"
+            onClick={() => setShowHelp(false)}
+            style={{
+              position: "fixed",
+              inset: 0,
+              border: "none",
+              background: "rgba(0, 0, 0, 0.35)",
+              padding: 0,
+              margin: 0,
+              zIndex: 40,
+            }}
+          />
+          <dialog
+            open
+            aria-label="How to use HKUST Timetable Optimizer"
+            style={{
+              border: "none",
+              padding: 0,
+              background: "transparent",
+              position: "fixed",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+              margin: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 50,
+            }}
+          >
+            <div
+              style={{
+                background: "white",
+                borderRadius: 14,
+                padding: 20,
+                width: "100%",
+                maxWidth: 760,
+                maxHeight: "85vh",
+                overflowY: "auto",
+                boxShadow: "0 12px 30px rgba(0,0,0,0.2)",
+              }}
+            >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+              <div style={{ fontSize: 18, fontWeight: 800 }}>How to use</div>
+              <button
+                type="button"
+                onClick={() => setShowHelp(false)}
+                aria-label="Close"
+                style={{
+                  border: "none",
+                  background: "transparent",
+                  fontSize: 20,
+                  cursor: "pointer",
+                  color: "#666",
+                }}
+              >
+                ×
+              </button>
+            </div>
+            <div style={{ marginTop: 12, fontSize: 14, color: "#444", lineHeight: 1.5 }}>
+              <div style={{ fontWeight: 700 }}>1) Choose a term</div>
+              <div style={{ marginBottom: 10 }}>
+                Pick “2025 Spring” or “2025 Summer”. The label is just for clarity, but it loads the right term data behind the scenes.
+              </div>
+
+              <div style={{ fontWeight: 700 }}>2) Add courses</div>
+              <div style={{ marginBottom: 10 }}>
+                Use the search box to find a course by code or title, then click “Add”. Selected courses show as chips you can remove.
+              </div>
+
+              <div style={{ fontWeight: 700 }}>3) Set preferences</div>
+              <div style={{ marginBottom: 10 }}>
+                <div><b>Hard</b> preferences are strict rules (e.g. “Must be free on Tue”). Any schedule that violates them is rejected.</div>
+                <div><b>Soft</b> preferences are scored (e.g. “No classes after 5pm”). The optimizer tries to minimize these penalties.</div>
+              </div>
+
+              <div style={{ fontWeight: 700 }}>4) Optimize</div>
+              <div style={{ marginBottom: 10 }}>
+                Click “Optimize” to generate the best schedules. Each option shows a score and key tradeoffs.
+              </div>
+
+              <div style={{ fontWeight: 700 }}>5) Compare results</div>
+              <div style={{ marginBottom: 10 }}>
+                Pin options you like, then select two to overlay and compare. This helps you choose between close tradeoffs.
+              </div>
+            </div>
+          </div>
+          </dialog>
+        </>
       )}
     </div>
   );
