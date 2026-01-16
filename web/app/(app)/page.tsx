@@ -2,8 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { optimizeRanked, Prefs } from "@/lib/api";
-import { TimetableGrid, CompareTimetableGrid } from "./components/TimetableGrid";
-import { CoursePicker } from "./components/CoursePicker";
+import { TimetableGrid, CompareTimetableGrid } from "../components/TimetableGrid";
+import { CoursePicker } from "../components/CoursePicker";
 
 
 const DAYS = ["Mo", "Tu", "We", "Th", "Fr"] as const;
