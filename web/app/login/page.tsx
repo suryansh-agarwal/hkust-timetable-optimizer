@@ -10,23 +10,30 @@ export default function LoginPage() {
   const [hoverPrimary, setHoverPrimary] = useState(false);
 
   async function continueWithGoogle() {
+    setErr(null);
     setLoadingGoogle(true);
-
-    const origin = globalThis.location.origin;
-
+  
+    // optional while testing multiple accounts
+    await supabase.auth.signOut();
+  
+    const redirectTo =
+      "https://hkust-timetable-optimizer.vercel.app/auth/callback?next=/";
+  
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${origin}/auth/callback?next=/`,
+        redirectTo,
+        queryParams: { prompt: "select_account" },
       },
     });
-
-    // Usually Supabase redirects away immediately; error only if blocked/misconfigured
+  
     if (error) {
       setErr(error.message);
       setLoadingGoogle(false);
     }
   }
+  
+  
 
   return (
     <main

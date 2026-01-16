@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+
 import { optimizeRanked, Prefs } from "@/lib/api";
 import { TimetableGrid, CompareTimetableGrid } from "../components/TimetableGrid";
 import { CoursePicker } from "../components/CoursePicker";
@@ -195,6 +197,21 @@ function bonusLabel(b: { type: string; value?: number }) {
 
 
 export default function Home() {
+  const [email, setEmail] = useState("none");
+
+  useEffect(() => {
+    createClient().auth.getUser().then(({ data }) => {
+      setEmail(data.user?.email ?? "none");
+    });
+  }, []);
+
+  return (
+    <div style={{ padding: 16 }}>
+      <div><b>Logged in as:</b> {email}</div>
+      {/* rest of your app */}
+    </div>
+  );
+}
   const [term, setTerm] = useState("2530");
   const [showHelp, setShowHelp] = useState(true);
 
@@ -362,7 +379,7 @@ export default function Home() {
 
   const active = result?.results?.[activeIdx];
   const meetings = useMemo(() => (active ? flattenSchedule(active.schedule) : []), [active]);
-
+  
   return (
     <div style={{ maxWidth: 1200, margin: "0 auto", padding: "20px 24px", fontFamily: "system-ui", width: "100%" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
@@ -388,7 +405,6 @@ export default function Home() {
           How to use?
         </button>
       </div>
-
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
         <div style={{ border: "1px solid #ddd", borderRadius: 12, padding: 14 }}>
           <div style={{ marginBottom: 10 }}>

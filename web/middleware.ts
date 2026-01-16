@@ -22,13 +22,25 @@ function isPublicPath(pathname: string) {
   );
 }
 
+function withDebugHeaders(
+  res: NextResponse,
+  info: { decision: string; hasUser: boolean; allowed: boolean; domain: string }
+) {
+  res.headers.set("x-hkust-gate", "middleware-hit");
+  res.headers.set("x-hkust-decision", info.decision);
+  res.headers.set("x-hkust-has-user", info.hasUser ? "yes" : "no");
+  res.headers.set("x-hkust-allowed", info.allowed ? "yes" : "no");
+  // domain only, no PII
+  res.headers.set("x-hkust-domain", info.domain || "none");
+  return res;
+}
+
 export async function middleware(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = getKey();
 
-  if (!url || !key) {
-    return NextResponse.next();
-  }
+  // If env missing, don't brick the site (but this should not happen on Vercel)
+  if (!url || !key) return NextResponse.next();
 
   let response = NextResponse.next({ request });
 
@@ -52,40 +64,64 @@ export async function middleware(request: NextRequest) {
     },
   });
 
-  // DEBUG HEADER (remove later)
-  response.headers.set("x-hkust-gate", "middleware-hit");
-
   const pathname = request.nextUrl.pathname;
 
-  if (isPublicPath(pathname)) return response;
+  // Don't gate public routes
+  if (isPublicPath(pathname)) {
+    return withDebugHeaders(response, {
+      decision: "public",
+      hasUser: false,
+      allowed: false,
+      domain: "",
+    });
+  }
 
-  const { data: { user } } = await supabase.auth.getUser();
+  // Get user (validates session)
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  // not logged in
+  const domain = user?.email?.split("@")[1] ?? "";
+
   if (!user?.email) {
     const loginUrl = new URL("/login", request.nextUrl.origin);
     loginUrl.searchParams.set("next", pathname);
-    return NextResponse.redirect(loginUrl);
+    const res = NextResponse.redirect(loginUrl);
+    return withDebugHeaders(res, {
+      decision: "redirect-login",
+      hasUser: false,
+      allowed: false,
+      domain: "",
+    });
   }
 
-  // allowlist check
   const email = user.email.toLowerCase();
 
-  const { data: allowRow } = await supabase
+  // STRICT allowlist check (avoid maybeSingle edge cases)
+  const { data, error } = await supabase
     .from("access_allowlist")
     .select("email")
     .eq("email", email)
-    .maybeSingle();
+    .limit(1);
 
-  if (!allowRow) {
-    return NextResponse.redirect(new URL("/request-access", request.nextUrl.origin));
+  const allowed = !error && Array.isArray(data) && data.length === 1;
+
+  if (!allowed) {
+    const res = NextResponse.redirect(new URL("/request-access", request.nextUrl.origin));
+    return withDebugHeaders(res, {
+      decision: "redirect-request-access",
+      hasUser: true,
+      allowed: false,
+      domain,
+    });
   }
 
-  response.headers.set("x-hkust-email-domain", email.split("@")[1] ?? "none");
-  response.headers.set("x-hkust-allowed", allowRow ? "yes" : "no");
-
-
-  return response;
+  return withDebugHeaders(response, {
+    decision: "allowed",
+    hasUser: true,
+    allowed: true,
+    domain,
+  });
 }
 
 export const config = {
