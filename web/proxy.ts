@@ -5,7 +5,6 @@ export async function proxy(request: NextRequest) {
   return updateSession(request);
 }
 
-// Start broad; tighten later
 export const config = {
   matcher: ["/((?!_next|.*\\..*).*)"],
 };
