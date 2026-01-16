@@ -13,24 +13,16 @@ export default function LoginPage() {
     setErr(null);
     setLoadingGoogle(true);
   
-    // optional while testing multiple accounts
-    await supabase.auth.signOut();
-  
-    const redirectTo =
-      "https://hkust-timetable-optimizer.vercel.app/auth/callback?next=/";
-  
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo,
-        queryParams: { prompt: "select_account" },
-      },
+    const siteUrl =
+    process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin;
+
+    await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+            redirectTo: `${siteUrl}/auth/callback?next=/`,
+            queryParams: { prompt: "select_account" },
+        },
     });
-  
-    if (error) {
-      setErr(error.message);
-      setLoadingGoogle(false);
-    }
   }
   
   
