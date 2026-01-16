@@ -4,23 +4,21 @@ import { createClient } from "@/lib/supabase/server";
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
 
-  // 1) must be logged in
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+  const { data: { user }, error: userErr } = await supabase.auth.getUser();
+  if (userErr) redirect("/login");
   if (!user?.email) redirect("/login");
 
   const email = user.email.toLowerCase();
 
-  // 2) must be allowlisted (RLS ensures user can only see their own row)
-  const { data: allowRow } = await supabase
+  // CRITICAL: must filter by THIS email
+  const { data: allowRow, error: allowErr } = await supabase
     .from("access_allowlist")
     .select("email")
     .eq("email", email)
     .maybeSingle();
 
-  if (!allowRow) redirect("/request-access");
+  // If no row matches, they are NOT allowed
+  if (allowErr || !allowRow) redirect("/request-access");
 
   return <>{children}</>;
 }
