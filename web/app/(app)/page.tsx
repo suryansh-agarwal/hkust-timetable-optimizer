@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
+import { useEffect, useMemo, useState } from "react";
 import { optimizeRanked, Prefs } from "@/lib/api";
 import { TimetableGrid, CompareTimetableGrid } from "../components/TimetableGrid";
 import { CoursePicker } from "../components/CoursePicker";
@@ -204,14 +204,6 @@ export default function Home() {
       setEmail(data.user?.email ?? "none");
     });
   }, []);
-
-  return (
-    <div style={{ padding: 16 }}>
-      <div><b>Logged in as:</b> {email}</div>
-      {/* rest of your app */}
-    </div>
-  );
-}
   const [term, setTerm] = useState("2530");
   const [showHelp, setShowHelp] = useState(true);
 
@@ -388,6 +380,7 @@ export default function Home() {
           <div style={{ marginTop: 4, fontSize: 13, color: "#666" }}>
             Build a schedule with soft and hard preferences
           </div>
+          <div><b>Logged in as:</b> {email}</div>
         </div>
         <button
           type="button"
