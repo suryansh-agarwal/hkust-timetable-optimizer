@@ -10,8 +10,8 @@ import { CoursePicker } from "../components/CoursePicker";
 
 const DAYS = ["Mo", "Tu", "We", "Th", "Fr"] as const;
 const TERM_OPTIONS = [
-  { value: "2530", label: "2025 Spring" },
-  { value: "2540", label: "2025 Summer" },
+  { value: "2530", label: "2026 Spring" },
+  { value: "2540", label: "2026 Summer" },
 ] as const;
 
 // Time options for soft no-after (12:00–20:00 in 30-min steps)
@@ -197,17 +197,84 @@ function bonusLabel(b: { type: string; value?: number }) {
 
 
 export default function Home() {
+  const supabase = useMemo(() => createClient(), []);
   const [email, setEmail] = useState("none");
-
-  useEffect(() => {
-    createClient().auth.getUser().then(({ data }) => {
-      setEmail(data.user?.email ?? "none");
-    });
-  }, []);
+  const [userId, setUserId] = useState<string | null>(null);
   const [term, setTerm] = useState("2530");
   const [showHelp, setShowHelp] = useState(true);
 
-  const [selectedCourses, setSelectedCourses] = useState<string[]>(["COMP 2011", "ECON 3334", "MATH 2350"]);
+  const [selectedCourses, setSelectedCourses] = useState<string[]>([]);
+  const [selectionsLoaded, setSelectionsLoaded] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadUserAndSelections() {
+      setSelectionsLoaded(false);
+      const { data } = await supabase.auth.getUser();
+      const uid = data.user?.id ?? null;
+
+      if (cancelled) return;
+
+      setEmail(data.user?.email ?? "none");
+      setUserId(uid);
+
+      if (!uid) {
+        setSelectedCourses([]);
+        setSelectionsLoaded(true);
+        return;
+      }
+
+      const { data: row, error } = await supabase
+        .from("user_course_selections")
+        .select("courses")
+        .eq("user_id", uid)
+        .eq("term", term)
+        .maybeSingle();
+
+      if (cancelled) return;
+
+      if (error) {
+        console.warn("Failed to load course selections", error);
+        setSelectedCourses([]);
+      } else {
+        setSelectedCourses(row?.courses ?? []);
+      }
+
+      setSelectionsLoaded(true);
+    }
+
+    loadUserAndSelections();
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase, term]);
+
+  useEffect(() => {
+    if (!userId || !selectionsLoaded) return;
+
+    const handle = setTimeout(() => {
+      (async () => {
+        const { error } = await supabase
+          .from("user_course_selections")
+          .upsert(
+            {
+              user_id: userId,
+              term,
+              courses: selectedCourses,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "user_id,term" }
+          );
+
+        if (error) {
+          console.warn("Failed to save course selections", error);
+        }
+      })();
+    }, 400);
+
+    return () => clearTimeout(handle);
+  }, [supabase, userId, term, selectedCourses, selectionsLoaded]);
 
   // Hard free days (multi-select)
   const [hardFreeDays, setHardFreeDays] = useState<string[]>([]);
