@@ -30,6 +30,23 @@ function minutesToHHMM(m: number) {
   return `${hh}:${mm}`;
 }
 
+function getSubjectFromCode(courseCode: string) {
+  const matcher = /^[A-Z]+/;
+  const match = matcher.exec(courseCode.trim().toUpperCase());
+  return match ? match[0] : courseCode.trim().toUpperCase();
+}
+
+const SUBJECT_COLORS = [
+  { bg: "rgba(59, 130, 246, 0.16)", border: "rgba(59, 130, 246, 0.5)", text: "#1d4ed8" },
+  { bg: "rgba(16, 185, 129, 0.16)", border: "rgba(16, 185, 129, 0.5)", text: "#047857" },
+  { bg: "rgba(244, 63, 94, 0.16)", border: "rgba(244, 63, 94, 0.5)", text: "#be123c" },
+  { bg: "rgba(168, 85, 247, 0.16)", border: "rgba(168, 85, 247, 0.5)", text: "#7c3aed" },
+  { bg: "rgba(234, 88, 12, 0.16)", border: "rgba(234, 88, 12, 0.5)", text: "#c2410c" },
+  { bg: "rgba(14, 116, 144, 0.16)", border: "rgba(14, 116, 144, 0.5)", text: "#0e7490" },
+  { bg: "rgba(99, 102, 241, 0.16)", border: "rgba(99, 102, 241, 0.5)", text: "#4338ca" },
+  { bg: "rgba(245, 158, 11, 0.16)", border: "rgba(245, 158, 11, 0.5)", text: "#b45309" },
+];
+
 // simple overlap "lane" assignment per day
 function assignLanes<T extends Meeting>(meetings: T[]): { placed: (T & { lane: number })[]; laneCount: number } {
   const sorted = [...meetings].sort((a, b) => a.start_min - b.start_min || a.end_min - b.end_min);
@@ -94,6 +111,17 @@ export function TimetableGrid(props: {
   const pxPerMin = hourRowHeight / 60;
   const gridHeight = totalMin * pxPerMin;
 
+  const subjectColors = useMemo(() => {
+    const subjects = Array.from(
+      new Set(props.meetings.map((m) => getSubjectFromCode(m.course_code)))
+    ).sort((a, b) => a.localeCompare(b));
+    const map = new Map<string, { bg: string; border: string; text: string }>();
+    subjects.forEach((subject, idx) => {
+      map.set(subject, SUBJECT_COLORS[idx % SUBJECT_COLORS.length]);
+    });
+    return map;
+  }, [props.meetings]);
+
   return (
     <div style={{ border: "1px solid #ddd", borderRadius: 12, overflow: "hidden" }}>
       {/* header */}
@@ -140,6 +168,9 @@ export function TimetableGrid(props: {
                 const laneWidthPct = 100 / lanes;
                 const leftPct = m.lane * laneWidthPct;
 
+                const subject = getSubjectFromCode(m.course_code);
+                const colors = subjectColors.get(subject) ?? SUBJECT_COLORS[0];
+
                 return (
                   <div
                     key={idx}
@@ -151,17 +182,17 @@ export function TimetableGrid(props: {
                       left: `calc(${leftPct}% + ${gap / 2}px)`,
                       width: `calc(${laneWidthPct}% - ${gap}px)`,
                       borderRadius: 10,
-                      border: "1px solid #e6e6e6",
+                      border: `2px solid ${colors.border}`,
                       padding: 8,
                       fontSize: 12,
-                      background: "white",
-                      boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
+                      background: colors.bg,
+                      boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
                       overflow: "hidden",
                     }}
                   >
-                    <div style={{ fontWeight: 800, fontSize: 12 }}>{m.course_code}</div>
-                    <div style={{ fontSize: 12, color: "#444" }}>{m.section}</div>
-                    <div style={{ fontSize: 11, color: "#666", marginTop: 4 }}>
+                    <div style={{ fontWeight: 800, fontSize: 12, color: colors.text }}>{m.course_code}</div>
+                    <div style={{ fontSize: 12, color: colors.text, opacity: 0.85 }}>{m.section}</div>
+                    <div style={{ fontSize: 11, color: colors.text, opacity: 0.75, marginTop: 4 }}>
                       {minutesToHHMM(m.start_min)}–{minutesToHHMM(m.end_min)}
                     </div>
                   </div>
