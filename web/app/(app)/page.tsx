@@ -449,21 +449,51 @@ export default function Home() {
           </div>
           <div><b>Logged in as:</b> {email}</div>
         </div>
-        <button
-          type="button"
-          onClick={() => setShowHelp(true)}
-          style={{
-            border: "1px solid #ddd",
-            background: "white",
-            borderRadius: 10,
-            padding: "8px 12px",
-            fontSize: 13,
-            fontWeight: 700,
-            cursor: "pointer",
-          }}
-        >
-          How to use?
-        </button>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <a
+            href="https://docs.google.com/forms/d/e/1FAIpQLSdUPWeLVqBYbBbZunz-tPnI3mvgGDgKN2onmYPKlZ13OcwNUA/viewform?usp=publish-editor"
+            target="_blank"
+            rel="noreferrer"
+            style={{
+              border: "1px solid #ddd",
+              background: "white",
+              borderRadius: 10,
+              padding: "8px 12px",
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: "pointer",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              color: "inherit",
+              textDecoration: "none",
+            }}
+            aria-label="Leave feedback"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden>
+              <path
+                fill="currentColor"
+                d="M5 4h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9l-4 3v-3H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm0 2v9h2v1.5L9 15h10V6H5Z"
+              />
+            </svg>
+            Feedback
+          </a>
+          <button
+            type="button"
+            onClick={() => setShowHelp(true)}
+            style={{
+              border: "1px solid #ddd",
+              background: "white",
+              borderRadius: 10,
+              padding: "8px 12px",
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >
+            How to use?
+          </button>
+        </div>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
         <div style={{ border: "1px solid #ddd", borderRadius: 12, padding: 14 }}>
@@ -1107,6 +1137,11 @@ export default function Home() {
               <div style={{ fontWeight: 700 }}>5) Compare results</div>
               <div style={{ marginBottom: 10 }}>
                 Pin options you like, then select two to overlay and compare. This helps you choose between close tradeoffs.
+              </div>
+
+              <div style={{ fontWeight: 700 }}>5) P.S.</div>
+              <div style={{ marginBottom: 10 }}>
+                This is a work in progress. Please report any issues or feedback to google form on the top right. Also, dark mode is not supported yet.
               </div>
             </div>
           </div>
