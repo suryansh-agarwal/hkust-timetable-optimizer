@@ -1085,7 +1085,7 @@ export default function Home() {
             <div style={{ marginTop: 12, fontSize: 14, color: "#444", lineHeight: 1.5 }}>
               <div style={{ fontWeight: 700 }}>1) Choose a term</div>
               <div style={{ marginBottom: 10 }}>
-                Pick “2025 Spring” or “2025 Summer”. The label is just for clarity, but it loads the right term data behind the scenes.
+                Pick “2026 Spring” or “2026 Summer”. The label is just for clarity, but it loads the right term data behind the scenes.
               </div>
 
               <div style={{ fontWeight: 700 }}>2) Add courses</div>
@@ -1101,7 +1101,7 @@ export default function Home() {
 
               <div style={{ fontWeight: 700 }}>4) Optimize</div>
               <div style={{ marginBottom: 10 }}>
-                Click “Optimize” to generate the best schedules. Each option shows a score and key tradeoffs.
+                Click “Optimize” to generate the best schedules. Each option shows a score and key tradeoffs. (it may take up to a minute to load the results)
               </div>
 
               <div style={{ fontWeight: 700 }}>5) Compare results</div>

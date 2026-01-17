@@ -84,6 +84,7 @@ export function searchCourseIndex(
   }
 
   const qLower = query.trim().toLowerCase();
+  const qNoSpace = q.replaceAll(" ", "");
 
   // Score each entry:
   // - 3 points: course_code starts with query (prefix match)
@@ -95,11 +96,12 @@ export function searchCourseIndex(
   for (const entry of cached) {
     let score = 0;
     const codeUpper = entry.course_code.toUpperCase();
+    const codeNoSpace = codeUpper.replaceAll(" ", "");
     const titleLower = entry.title.toLowerCase();
 
-    if (codeUpper.startsWith(q)) {
+    if (codeUpper.startsWith(q) || codeNoSpace.startsWith(qNoSpace)) {
       score = 3;
-    } else if (codeUpper.includes(q)) {
+    } else if (codeUpper.includes(q) || codeNoSpace.includes(qNoSpace)) {
       score = 2;
     } else if (titleLower.includes(qLower)) {
       score = 1;
