@@ -1139,7 +1139,7 @@ export default function Home() {
                 Pin options you like, then select two to overlay and compare. This helps you choose between close tradeoffs.
               </div>
 
-              <div style={{ fontWeight: 700 }}>5) P.S.</div>
+              <div style={{ fontWeight: 700 }}>6) P.S.</div>
               <div style={{ marginBottom: 10 }}>
                 This is a work in progress. Please report any issues or feedback to google form on the top right. Also, dark mode is not supported yet.
               </div>
