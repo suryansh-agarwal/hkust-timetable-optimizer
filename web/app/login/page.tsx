@@ -63,7 +63,11 @@ export default function LoginPage() {
             }}
             aria-hidden
           >
-            T
+            <img
+              src="/login/calendar-icon.png"
+              alt="Calendar icon"
+              style={{ width: 24, height: 24, display: "block" }}
+            />
           </div>
           <div>
             <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800 }}>Welcome back</h1>
