@@ -2,18 +2,27 @@
 
 import { createClient } from "@/lib/supabase/client";
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 export default function RequestAccessPage() {
   const supabase = createClient();
   const [email, setEmail] = useState<string>("");
   const [copied, setCopied] = useState(false);
   const [hoverPrimary, setHoverPrimary] = useState(false);
+  const searchParams = useSearchParams();
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
-      setEmail(data.user?.email ?? "");
+      const sessionEmail = data.user?.email ?? "";
+      if (sessionEmail) {
+        setEmail(sessionEmail);
+        return;
+      }
+
+      const queryEmail = searchParams.get("email") ?? "";
+      if (queryEmail) setEmail(queryEmail);
     });
-  }, [supabase]);
+  }, [supabase, searchParams]);
 
   async function copyEmail() {
     if (!email) return;

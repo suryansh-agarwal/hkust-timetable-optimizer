@@ -1,16 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
   const supabase = createClient();
   const [loadingGoogle, setLoadingGoogle] = useState(false);
+  const [loadingEmail, setLoadingEmail] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [hoverPrimary, setHoverPrimary] = useState(false);
+  const [hoverEmail, setHoverEmail] = useState(false);
+  const [emailInput, setEmailInput] = useState("");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextPath = useMemo(() => searchParams.get("next") ?? "/", [searchParams]);
 
   async function continueWithGoogle() {
     setErr(null);
+    setNotice(null);
     setLoadingGoogle(true);
   
     const siteUrl =
@@ -19,10 +28,58 @@ export default function LoginPage() {
     await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-            redirectTo: `${siteUrl}/auth/callback?next=/`,
+            redirectTo: `${siteUrl}/auth/callback?next=${encodeURIComponent(nextPath)}`,
             queryParams: { prompt: "select_account" },
         },
     });
+  }
+
+  async function continueWithEmail(event: React.FormEvent) {
+    event.preventDefault();
+    setErr(null);
+    setNotice(null);
+
+    const email = emailInput.trim().toLowerCase();
+    if (!email) {
+      setErr("Enter a valid email address.");
+      return;
+    }
+
+    setLoadingEmail(true);
+
+    try {
+      const { data, error } = await supabase
+        .from("access_allowlist")
+        .select("email")
+        .eq("email", email)
+        .limit(1);
+
+      const allowed = !error && Array.isArray(data) && data.length === 1;
+
+      if (!allowed && !error) {
+        router.push(`/request-access?email=${encodeURIComponent(email)}`);
+        return;
+      }
+
+      if (error) {
+        setNotice("Could not verify access yet. We will check after login.");
+      }
+
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin;
+
+      await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          emailRedirectTo: `${siteUrl}/auth/callback?next=${encodeURIComponent(nextPath)}`,
+        },
+      });
+
+      setNotice("Magic link sent. Check your email to continue.");
+    } catch {
+      setErr("Could not send the magic link. Try again in a moment.");
+    } finally {
+      setLoadingEmail(false);
+    }
   }
   
   
@@ -110,7 +167,67 @@ export default function LoginPage() {
             </svg>
             {loadingGoogle ? "Redirecting..." : "Continue with Google"}
           </button>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              color: "#6b7280",
+              fontSize: 12,
+              fontWeight: 700,
+            }}
+            aria-hidden
+          >
+            <div style={{ flex: 1, height: 1, background: "#e5e7eb" }} />
+            <span>--- Or ---</span>
+            <div style={{ flex: 1, height: 1, background: "#e5e7eb" }} />
+          </div>
+          <form onSubmit={continueWithEmail} style={{ display: "grid", gap: 10 }}>
+            <input
+              type="email"
+              value={emailInput}
+              onChange={(event) => setEmailInput(event.target.value)}
+              placeholder="Email address"
+              required
+              style={{
+                width: "100%",
+                padding: "12px 14px",
+                borderRadius: 12,
+                border: "1px solid #e5e7eb",
+                fontSize: 14,
+                fontWeight: 500,
+                outline: "none",
+              }}
+            />
+            <button
+              type="submit"
+              disabled={loadingEmail}
+              onMouseEnter={() => setHoverEmail(true)}
+              onMouseLeave={() => setHoverEmail(false)}
+              style={{
+                width: "100%",
+                padding: "12px 14px",
+                borderRadius: 12,
+                border: "1px solid #e5e7eb",
+                background: hoverEmail ? "#f9fafb" : "white",
+                color: "#111827",
+                fontWeight: 700,
+                fontSize: 14,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 10,
+                transition: "transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease",
+                transform: hoverEmail ? "translateY(-1px)" : "translateY(0)",
+                boxShadow: hoverEmail ? "0 10px 20px rgba(15, 23, 42, 0.2)" : "none",
+              }}
+            >
+              {loadingEmail ? "Sending..." : "Continue with email"}
+            </button>
+          </form>
           {err && <div style={{ marginTop: 6, color: "#b91c1c", fontWeight: 600 }}>Error: {err}</div>}
+          {notice && <div style={{ marginTop: 6, color: "#2563eb", fontWeight: 600 }}>{notice}</div>}
         </div>
 
       </div>
