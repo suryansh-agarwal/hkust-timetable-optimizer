@@ -1,10 +1,10 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
-export default function RequestAccessPage() {
+function RequestAccessContent() {
   const supabase = createClient();
   const [email, setEmail] = useState<string>("");
   const [copied, setCopied] = useState(false);
@@ -135,5 +135,13 @@ export default function RequestAccessPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function RequestAccessPage() {
+  return (
+    <Suspense fallback={null}>
+      <RequestAccessContent />
+    </Suspense>
   );
 }
