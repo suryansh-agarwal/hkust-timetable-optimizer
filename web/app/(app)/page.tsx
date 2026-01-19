@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { optimizeRanked, Prefs } from "@/lib/api";
 import { TimetableGrid, CompareTimetableGrid } from "../components/TimetableGrid";
 import { CoursePicker } from "../components/CoursePicker";
+import { InfoIconButton, InfoModal } from "../components/InfoModal";
 
 
 const DAYS = ["Mo", "Tu", "We", "Th", "Fr"] as const;
@@ -202,6 +203,8 @@ export default function Home() {
   const [userId, setUserId] = useState<string | null>(null);
   const [term, setTerm] = useState("2530");
   const [showHelp, setShowHelp] = useState(true);
+  const [openHardInfo, setOpenHardInfo] = useState(false);
+  const [openSoftInfo, setOpenSoftInfo] = useState(false);
 
   const [selectedCourses, setSelectedCourses] = useState<string[]>([]);
   const [selectionsLoaded, setSelectionsLoaded] = useState(false);
@@ -493,6 +496,30 @@ export default function Home() {
           >
             How to use?
           </button>
+          <button
+            type="button"
+            onClick={runOptimize}
+            disabled={loading || selectedCourses.length === 0}
+            style={{
+              border: "none",
+              background: "#003366",
+              color: "white",
+              borderRadius: 10,
+              padding: "8px 12px",
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: loading || selectedCourses.length === 0 ? "not-allowed" : "pointer",
+              opacity: loading || selectedCourses.length === 0 ? 0.6 : 1,
+            }}
+            onMouseEnter={(e) => {
+              if (!loading && selectedCourses.length > 0) e.currentTarget.style.background = "#0a3a66";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "#003366";
+            }}
+          >
+            {loading ? "Optimizing..." : "Optimize"}
+          </button>
         </div>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
@@ -530,7 +557,10 @@ export default function Home() {
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 10 }}>
             <div style={{ border: "1px solid #eee", borderRadius: 10, padding: 12, background: "#fafafa" }}>
-              <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>Hard constraints</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, fontWeight: 700, marginBottom: 8 }}>
+                <span>Hard preferences</span>
+                <InfoIconButton onClick={() => setOpenHardInfo(true)} />
+              </div>
 
               {/* Hard Free Days (multi-select) */}
               <div>
@@ -623,7 +653,10 @@ export default function Home() {
             </div>
 
             <div style={{ border: "1px solid #eee", borderRadius: 10, padding: 12 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>Soft preferences</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, fontWeight: 700, marginBottom: 8 }}>
+                <span>Soft preferences</span>
+                <InfoIconButton onClick={() => setOpenSoftInfo(true)} />
+              </div>
 
               {/* Soft Free Days (multi-select) */}
               <div>
@@ -760,14 +793,30 @@ export default function Home() {
             </div>
           </div>
 
-          <button onClick={runOptimize} disabled={loading || selectedCourses.length === 0} style={{ marginTop: 12, width: "100%", padding: "10px 12px", fontWeight: 700 }}>
-            {loading ? "Optimizing..." : "Optimize"}
-          </button>
-
           {error && <div style={{ marginTop: 8, color: "crimson", whiteSpace: "pre-wrap" }}>{error}</div>}
         </div>
       </div>
 
+      <InfoModal open={openHardInfo} title="Hard preferences" onClose={() => setOpenHardInfo(false)}>
+        <div>Hard preferences are <strong>non-negotiable constraints</strong>.</div>
+        <div>If a timetable violates a hard preference, it’s rejected.</div>
+        <div style={{ marginTop: 10, fontWeight: 600 }}>Examples:</div>
+        <ul style={{ margin: "6px 0 0 18px" }}>
+          <li>No classes before 10:30</li>
+          <li>Keep Friday completely free</li>
+          <li>Avoid clashes (required)</li>
+        </ul>
+      </InfoModal>
+      <InfoModal open={openSoftInfo} title="Soft preferences" onClose={() => setOpenSoftInfo(false)}>
+        <div>Soft preferences are <strong>nice-to-haves</strong>.</div>
+        <div>The optimizer will try to satisfy them, but may trade them off to find a feasible timetable.</div>
+        <div style={{ marginTop: 10, fontWeight: 600 }}>Examples:</div>
+        <ul style={{ margin: "6px 0 0 18px" }}>
+          <li>Minimize gaps between classes</li>
+          <li>Prefer compact schedules</li>
+          <li>Prefer fewer days on campus</li>
+        </ul>
+      </InfoModal>
       {result && (
         <div style={{ marginTop: 14, border: "1px solid #ddd", borderRadius: 12, padding: 14 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
