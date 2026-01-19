@@ -2,11 +2,12 @@
 
 import { createClient } from "@/lib/supabase/client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { optimizeRanked, Prefs } from "@/lib/api";
 import { TimetableGrid, CompareTimetableGrid } from "../components/TimetableGrid";
 import { CoursePicker } from "../components/CoursePicker";
 import { InfoIconButton, InfoModal } from "../components/InfoModal";
+import { Toast } from "../components/Toast";
 
 
 const DAYS = ["Mo", "Tu", "We", "Th", "Fr"] as const;
@@ -322,6 +323,10 @@ export default function Home() {
   const [result, setResult] = useState<{ results: { score: number; breakdown: { penalties?: unknown[]; bonuses?: unknown[] }; schedule: unknown[] }[]; considered: number; returned: number } | null>(null);
   const [activeIdx, setActiveIdx] = useState(0);
   const [error, setError] = useState<string>("");
+  const [didJustOptimize, setDidJustOptimize] = useState(false);
+  const [toastOpen, setToastOpen] = useState(false);
+  const resultsRef = useRef<HTMLDivElement | null>(null);
+  const toastMessage = "Timetable not possible with current subjects";
 
   // ---- Pin + Compare state ----
   const [pinned, setPinned] = useState<Pinned[]>([]);
@@ -370,6 +375,8 @@ export default function Home() {
     setError("");
     setResult(null);
     setActiveIdx(0);
+    setDidJustOptimize(false);
+    setToastOpen(false);
 
     // Validate time constraints before running
     const conflicts = validateTimeConstraints(hardNoBefore, hardNoAfter, softNoBefore, softNoAfter, DAYS);
@@ -429,8 +436,14 @@ export default function Home() {
     };
 
     try {
-      const data = await optimizeRanked(term, selectedCourses, prefs, 5);
+      const data = await optimizeRanked(term, selectedCourses, prefs, 6);
       setResult(data);
+      const resultCount = data?.results?.length ?? 0;
+      if (resultCount === 0) {
+        setToastOpen(true);
+      } else {
+        setDidJustOptimize(true);
+      }
     } catch (e: unknown) {
       const errorMsg = e instanceof Error ? e.message : String(e);
       setError(errorMsg);
@@ -441,9 +454,23 @@ export default function Home() {
 
   const active = result?.results?.[activeIdx];
   const meetings = useMemo(() => (active ? flattenSchedule(active.schedule) : []), [active]);
+
+  useEffect(() => {
+    if (!didJustOptimize) return;
+    if ((result?.results?.length ?? 0) > 0) {
+      resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    setDidJustOptimize(false);
+  }, [didJustOptimize, result]);
   
   return (
     <div style={{ maxWidth: 1200, margin: "0 auto", padding: "20px 24px", fontFamily: "system-ui", width: "100%" }}>
+      <Toast
+        open={toastOpen}
+        variant="error"
+        message={toastMessage}
+        onClose={() => setToastOpen(false)}
+      />
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <div>
           <h1 style={{ fontSize: 28, fontWeight: 700, margin: 0 }}>HKUST Timetable Optimizer</h1>
@@ -817,8 +844,9 @@ export default function Home() {
           <li>Prefer fewer days on campus</li>
         </ul>
       </InfoModal>
-      {result && (
-        <div style={{ marginTop: 14, border: "1px solid #ddd", borderRadius: 12, padding: 14 }}>
+      <div ref={resultsRef} id="results" style={{ scrollMarginTop: 90 }}>
+        {result && (
+          <div style={{ marginTop: 14, border: "1px solid #ddd", borderRadius: 12, padding: 14 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
             <div>
               <div style={{ fontWeight: 700 }}>Results</div>
@@ -1096,8 +1124,9 @@ export default function Home() {
             )}
           </div>
 
-        </div>
-      )}
+          </div>
+        )}
+      </div>
       {showHelp && (
         <>
           <button
