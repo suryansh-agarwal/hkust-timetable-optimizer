@@ -95,27 +95,6 @@ export async function middleware(request: NextRequest) {
     });
   }
 
-  const email = user.email.toLowerCase();
-
-  // STRICT allowlist check (avoid maybeSingle edge cases)
-  const { data, error } = await supabase
-    .from("access_allowlist")
-    .select("email")
-    .eq("email", email)
-    .limit(1);
-
-  const allowed = !error && Array.isArray(data) && data.length === 1;
-
-  if (!allowed) {
-    const res = NextResponse.redirect(new URL("/request-access", request.nextUrl.origin));
-    return withDebugHeaders(res, {
-      decision: "redirect-request-access",
-      hasUser: true,
-      allowed: false,
-      domain,
-    });
-  }
-
   return withDebugHeaders(response, {
     decision: "allowed",
     hasUser: true,

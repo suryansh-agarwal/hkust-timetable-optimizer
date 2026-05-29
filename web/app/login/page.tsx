@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 function LoginContent() {
@@ -13,7 +13,6 @@ function LoginContent() {
   const [hoverPrimary, setHoverPrimary] = useState(false);
   const [hoverEmail, setHoverEmail] = useState(false);
   const [emailInput, setEmailInput] = useState("");
-  const router = useRouter();
   const searchParams = useSearchParams();
   const nextPath = useMemo(() => searchParams.get("next") ?? "/", [searchParams]);
 
@@ -48,23 +47,6 @@ function LoginContent() {
     setLoadingEmail(true);
 
     try {
-      const { data, error } = await supabase
-        .from("access_allowlist")
-        .select("email")
-        .eq("email", email)
-        .limit(1);
-
-      const allowed = !error && Array.isArray(data) && data.length === 1;
-
-      if (!allowed && !error) {
-        router.push(`/request-access?email=${encodeURIComponent(email)}`);
-        return;
-      }
-
-      if (error) {
-        setNotice("Could not verify access yet. We will check after login.");
-      }
-
       const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin;
 
       await supabase.auth.signInWithOtp({

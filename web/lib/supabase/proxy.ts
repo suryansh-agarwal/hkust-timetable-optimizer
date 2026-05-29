@@ -72,22 +72,7 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // Logged in but not allowlisted -> request access
-  const email = user.email.toLowerCase();
-
-  const { data: allowRow } = await supabase
-    .from("access_allowlist")
-    .select("email")
-    .eq("email", email)
-    .maybeSingle();
-
-  if (!allowRow) {
-    return NextResponse.redirect(new URL("/request-access", request.nextUrl.origin));
-  }
-
-  // right before `return response;`
   response.headers.set("x-hkust-gate", "hit");
-
 
   return response;
 }
