@@ -40,11 +40,12 @@ class MockWeights:
 class MockPrefs:
     hard_free_days: List[str]
     hard_no_after: Dict[str, str]
+    hard_no_before: Dict[str, str]
     soft_free_days: List[str]
     soft_no_after: Dict[str, str]
     soft_no_before: Dict[str, str]
     prefer_one_free_day: bool
-    compact_days: bool
+    gap_shape: str
     weights: MockWeights
 
 
@@ -67,11 +68,12 @@ def test_soft_no_after_penalty():
     prefs = MockPrefs(
         hard_free_days=[],
         hard_no_after={},
+        hard_no_before={},
         soft_free_days=[],
         soft_no_after={"Fr": "15:00"},  # cutoff at 15:00 = 900 min
         soft_no_before={},
         prefer_one_free_day=False,
-        compact_days=False,
+        gap_shape="no_preference",
         weights=MockWeights(),
     )
 
@@ -107,11 +109,12 @@ def test_soft_no_before_penalty():
     prefs = MockPrefs(
         hard_free_days=[],
         hard_no_after={},
+        hard_no_before={},
         soft_free_days=[],
         soft_no_after={},
         soft_no_before={"Mo": "10:00"},  # cutoff at 10:00 = 600 min
         prefer_one_free_day=False,
-        compact_days=False,
+        gap_shape="no_preference",
         weights=MockWeights(),
     )
 
@@ -147,11 +150,12 @@ def test_hard_free_day_rejection():
     prefs = MockPrefs(
         hard_free_days=["We"],
         hard_no_after={},
+        hard_no_before={},
         soft_free_days=[],
         soft_no_after={},
         soft_no_before={},
         prefer_one_free_day=False,
-        compact_days=False,
+        gap_shape="no_preference",
         weights=MockWeights(),
     )
 
@@ -167,32 +171,43 @@ def test_hard_free_day_rejection():
     print("PASS: test_hard_free_day_rejection")
 
 
-def test_gaps_penalty_with_weights():
-    """Two classes with 30 min gap; compact_days should penalize using weights.gaps_per_min."""
-    schedule = {
-        "TEST 3000": [
-            MockSection(
-                section="L1",
-                class_no=3001,
-                meetings=[
-                    MockMeeting(day="Mo", day_index=0, start_min=9*60, end_min=10*60),   # 09:00-10:00
-                    MockMeeting(day="Mo", day_index=0, start_min=10*60+30, end_min=11*60+30),  # 10:30-11:30
-                ],
-            )
-        ]
+def _schedule_with_gaps(gap_minutes_list):
+    """Build a schedule of 30-min classes on Mo (starting 09:00) separated by the given gaps.
+
+    gap_minutes_list has one entry per gap, so it produces len(gap_minutes_list) + 1 classes.
+    """
+    meetings = []
+    cursor = 9 * 60
+    meetings.append(MockMeeting(day="Mo", day_index=0, start_min=cursor, end_min=cursor + 30))
+    cursor += 30
+    for gap in gap_minutes_list:
+        cursor += gap
+        meetings.append(MockMeeting(day="Mo", day_index=0, start_min=cursor, end_min=cursor + 30))
+        cursor += 30
+    return {
+        "TEST 3000": [MockSection(section="L1", class_no=3001, meetings=meetings)]
     }
+
+
+def _score_with_shape(schedule, gap_shape):
     prefs = MockPrefs(
         hard_free_days=[],
         hard_no_after={},
+        hard_no_before={},
         soft_free_days=[],
         soft_no_after={},
         soft_no_before={},
         prefer_one_free_day=False,
-        compact_days=True,
+        gap_shape=gap_shape,
         weights=MockWeights(gaps_per_min=0.10),
     )
+    return score_schedule(schedule, prefs)
 
-    score, breakdown = score_schedule(schedule, prefs)
+
+def test_gaps_penalty_no_preference_matches_linear_sum():
+    """Two classes with 30 min gap; no_preference should penalize using weights.gaps_per_min (today's linear behavior)."""
+    schedule = _schedule_with_gaps([30])
+    score, breakdown = _score_with_shape(schedule, "no_preference")
 
     assert not breakdown["rejected"], "Should not be rejected"
     gap_penalty = next((p for p in breakdown["penalties"] if p["type"] == "gaps_minutes"), None)
@@ -202,13 +217,61 @@ def test_gaps_penalty_with_weights():
     expected_penalty = -30 * 0.10
     assert gap_penalty["value"] == expected_penalty, f"Expected {expected_penalty}, got {gap_penalty['value']}"
 
-    print("PASS: test_gaps_penalty_with_weights")
+    print("PASS: test_gaps_penalty_no_preference_matches_linear_sum")
+
+
+def test_gaps_penalty_consolidated_prefers_one_long_gap():
+    """One 180-min gap should score better (less negative) than three 60-min gaps under 'consolidated'."""
+    one_long = _schedule_with_gaps([180])
+    three_short = _schedule_with_gaps([60, 60, 60])
+
+    score_long, _ = _score_with_shape(one_long, "consolidated")
+    score_short, _ = _score_with_shape(three_short, "consolidated")
+
+    assert score_long > score_short, (
+        f"Expected one long gap to score higher under 'consolidated', "
+        f"got long={score_long}, short={score_short}"
+    )
+
+    print("PASS: test_gaps_penalty_consolidated_prefers_one_long_gap")
+
+
+def test_gaps_penalty_fragmented_prefers_short_gaps():
+    """Three 60-min gaps should score better (less negative) than one 180-min gap under 'fragmented'."""
+    one_long = _schedule_with_gaps([180])
+    three_short = _schedule_with_gaps([60, 60, 60])
+
+    score_long, _ = _score_with_shape(one_long, "fragmented")
+    score_short, _ = _score_with_shape(three_short, "fragmented")
+
+    assert score_short > score_long, (
+        f"Expected several short gaps to score higher under 'fragmented', "
+        f"got long={score_long}, short={score_short}"
+    )
+
+    print("PASS: test_gaps_penalty_fragmented_prefers_short_gaps")
+
+
+def test_gaps_penalty_zero_gap_is_zero_under_all_shapes():
+    """Back-to-back classes (no gap) should contribute 0 penalty regardless of shape."""
+    schedule = _schedule_with_gaps([0])
+    for shape in ("no_preference", "consolidated", "fragmented"):
+        _, breakdown = _score_with_shape(schedule, shape)
+        gap_penalty = next((p for p in breakdown["penalties"] if p["type"] == "gaps_minutes"), None)
+        assert gap_penalty is not None, f"Expected gaps_minutes penalty entry for shape={shape}"
+        assert gap_penalty["minutes"] == 0, f"Expected 0 minutes for shape={shape}, got {gap_penalty['minutes']}"
+        assert gap_penalty["value"] == 0, f"Expected 0 value for shape={shape}, got {gap_penalty['value']}"
+
+    print("PASS: test_gaps_penalty_zero_gap_is_zero_under_all_shapes")
 
 
 if __name__ == "__main__":
     test_soft_no_after_penalty()
     test_soft_no_before_penalty()
     test_hard_free_day_rejection()
-    test_gaps_penalty_with_weights()
+    test_gaps_penalty_no_preference_matches_linear_sum()
+    test_gaps_penalty_consolidated_prefers_one_long_gap()
+    test_gaps_penalty_fragmented_prefers_short_gaps()
+    test_gaps_penalty_zero_gap_is_zero_under_all_shapes()
     print("\nAll sanity tests passed!")
 

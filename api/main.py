@@ -20,7 +20,7 @@ from fastapi import Body
 from bundles import build_bundles, MatchingConstraint
 from optimizer_bundles import BundleChoice, find_bundle_schedules, schedule_to_json as schedule_to_json_bundles
 
-from typing import Any, Optional, Dict, List
+from typing import Any, Optional, Dict, List, Literal
 from pydantic import BaseModel, Field, field_validator, model_validator
 import re
 
@@ -154,7 +154,7 @@ class Preferences(BaseModel):
 
     # Style preferences (penalties)
     prefer_one_free_day: bool = False
-    compact_days: bool = False  # fewer gaps within a day
+    gap_shape: Literal["no_preference", "consolidated", "fragmented"] = "no_preference"
 
     # Weights for scoring
     weights: Weights = Field(default_factory=Weights)

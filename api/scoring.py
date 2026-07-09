@@ -39,18 +39,31 @@ def violates_no_before(meetings, day: str, cutoff_min: int) -> bool:
     # violation if any class starts before cutoff
     return any(m["day"] == day and m["start_min"] < cutoff_min for m in meetings)
 
-def gaps_penalty(meetings) -> int:
-    # sum of idle minutes between classes on same day (penalty)
-    penalty = 0
+GAP_SHAPE_EXPONENTS = {
+    "no_preference": 1.0,   # sum(gap) - today's linear behavior
+    "consolidated": 0.5,    # concave - splitting into more gaps costs more (favors one long gap)
+    "fragmented": 2.0,      # convex - one big gap costs more (favors several short gaps)
+}
+
+def gaps_penalty(meetings, shape: str = "no_preference") -> float:
+    # per-day generalized power mean of idle minutes between classes on the same day.
+    # raise-then-root keeps the result in minutes-scale for any exponent, so p=1
+    # reduces to exactly sum(gap) and the gaps_per_min weight stays comparable
+    # across shapes.
+    p = GAP_SHAPE_EXPONENTS[shape]
+    penalty = 0.0
     by_day = {}
     for m in meetings:
         by_day.setdefault(m["day"], []).append(m)
     for day, ms in by_day.items():
         ms.sort(key=lambda x: x["start_min"])
+        gaps = []
         for a, b in zip(ms, ms[1:]):
             gap = b["start_min"] - a["end_min"]
             if gap > 0:
-                penalty += gap
+                gaps.append(gap)
+        if gaps:
+            penalty += sum(g ** p for g in gaps) ** (1 / p)
     return penalty
 
 def count_free_days(meetings) -> int:
@@ -170,11 +183,15 @@ def score_schedule(schedule: Dict[str, List[Section]], prefs) -> Tuple[float, Di
         score += min(free, 2) * 120
         breakdown["bonuses"].append({"type": "free_days", "count": free, "value": min(free, 2) * 120})
 
-    # compact days (minimize gaps) - use weights.gaps_per_min
-    if prefs.compact_days:
-        gp = gaps_penalty(ms)
-        penalty_value = -gp * weights.gaps_per_min
-        score += penalty_value
-        breakdown["penalties"].append({"type": "gaps_minutes", "minutes": gp, "value": penalty_value})
+    # gap shape (minimize/shape gaps within a day) - use weights.gaps_per_min
+    gp = gaps_penalty(ms, prefs.gap_shape)
+    penalty_value = -gp * weights.gaps_per_min
+    score += penalty_value
+    breakdown["penalties"].append({
+        "type": "gaps_minutes",
+        "minutes": gp,
+        "value": penalty_value,
+        "shape": prefs.gap_shape,
+    })
 
     return score, breakdown

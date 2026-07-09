@@ -133,7 +133,7 @@ export type Prefs = {
   soft_no_after?: Record<string, string>;
   soft_no_before?: Record<string, string>;
   prefer_one_free_day?: boolean;
-  compact_days?: boolean;
+  gap_shape?: "no_preference" | "consolidated" | "fragmented";
   weights?: {
     gaps_per_min?: number;
     late_after_per_min?: number;

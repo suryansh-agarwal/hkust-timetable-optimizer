@@ -95,6 +95,7 @@ const NO_BEFORE_TIMES = genNoBeforeTimes();
 const GAP_WEIGHTS = { Low: 0.05, Med: 0.10, High: 0.20 } as const;
 const EARLY_LATE_WEIGHTS = { Low: 0.25, Med: 0.50, High: 1.00 } as const;
 type WeightPreset = "Low" | "Med" | "High";
+type GapShape = "no_preference" | "consolidated" | "fragmented";
 
 // Per-day soft constraint state
 type SoftDayPref = { enabled: boolean; time: string };
@@ -183,17 +184,20 @@ function formatDayList(days: string[]) {
   return days.join(", ");
 }
 
-function penaltyLabel(p: { type: string; day?: string; cutoff?: string; minutes?: number }) {
+function penaltyLabel(p: { type: string; day?: string; cutoff?: string; minutes?: number; shape?: string }) {
   // make the labels less ugly than raw types
   if (p.type === "soft_no_after") return `After cutoff (${p.day} ${p.cutoff})`;
-  if (p.type === "gaps_minutes") return `Gaps (${p.minutes} min)`;
+  if (p.type === "gaps_minutes") {
+    const shapeLabel =
+      p.shape === "consolidated" ? ", prefer 1 long" : p.shape === "fragmented" ? ", prefer short" : "";
+    return `Gaps (${Math.round((p.minutes ?? 0) * 10) / 10} min${shapeLabel})`;
+  }
   if (p.type === "hard_free_day_violation") return `Hard free day violated (${p.day})`;
   return p.type;
 }
 
 function bonusLabel(b: { type: string; value?: number }) {
   if (b.type === "free_days") return `Free days (+${b.value})`;
-  if (b.type === "compact_days") return `Compact days (+${b.value})`;
   return b.type;
 }
 
@@ -317,7 +321,7 @@ export default function Home() {
   const [earlyLateWeightPreset, setEarlyLateWeightPreset] = useState<WeightPreset>("Med");
 
   const [preferOneFreeDay, setPreferOneFreeDay] = useState(true);
-  const [compactDays, setCompactDays] = useState(true);
+  const [gapShape, setGapShape] = useState<GapShape>("no_preference");
 
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{ results: { score: number; breakdown: { penalties?: unknown[]; bonuses?: unknown[] }; schedule: unknown[] }[]; considered: number; returned: number } | null>(null);
@@ -421,7 +425,7 @@ export default function Home() {
 
     const prefs: Prefs = {
       prefer_one_free_day: preferOneFreeDay,
-      compact_days: compactDays,
+      gap_shape: gapShape,
       hard_free_days: hardFreeDays,
       hard_no_after: hardNoAfterPayload,
       hard_no_before: hardNoBeforePayload,
@@ -805,17 +809,24 @@ export default function Home() {
                   <option value="High">High</option>
                 </select>
               </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#333" }}>
+                <span style={{ width: 140 }}>Gap shape:</span>
+                <select
+                  value={gapShape}
+                  onChange={(e) => setGapShape(e.target.value as GapShape)}
+                  style={{ padding: 6, fontSize: 13, borderRadius: 6 }}
+                >
+                  <option value="no_preference">No preference</option>
+                  <option value="consolidated">Prefer one long gap</option>
+                  <option value="fragmented">Prefer several short gaps</option>
+                </select>
+              </div>
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10, fontSize: 13, color: "#333" }}>
               <label style={{ display: "flex", gap: 10, alignItems: "center" }}>
                 <input type="checkbox" checked={preferOneFreeDay} onChange={(e) => setPreferOneFreeDay(e.target.checked)} />
                 Prefer at least one free weekday
-              </label>
-
-              <label style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                <input type="checkbox" checked={compactDays} onChange={(e) => setCompactDays(e.target.checked)} />
-                Prefer compact days (fewer gaps)
               </label>
             </div>
           </div>
