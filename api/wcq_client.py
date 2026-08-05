@@ -31,6 +31,58 @@ class FetchResult:
     url: str
 
 
+DEFAULT_HEADERS = {
+    "User-Agent": "hkust-timetable-optimizer/0.1 (personal project; respectful caching)",
+    "Accept": "text/html,application/xhtml+xml",
+}
+
+
+def _fetch_via_httpx(url: str, timeout: float) -> str:
+    # Force TLS 1.2 (some servers/network paths choke on TLS 1.3)
+    ctx = ssl.create_default_context()
+    ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+    ctx.maximum_version = ssl.TLSVersion.TLSv1_2
+    ctx.load_verify_locations(certifi.where())
+
+    transport = httpx.HTTPTransport(retries=3, http1=True, http2=False)
+
+    with httpx.Client(
+        timeout=httpx.Timeout(timeout, connect=15.0),
+        headers=DEFAULT_HEADERS,
+        verify=ctx,
+        follow_redirects=True,
+        transport=transport,
+    ) as client:
+        resp = client.get(url)
+        resp.raise_for_status()
+        return resp.text
+
+
+def _fetch_via_curl(url: str, timeout: float) -> str:
+    # Fallback to system curl (uses the OS TLS stack)
+    cmd = [
+        "curl", "-L",
+        "--fail",
+        "--silent",
+        "--show-error",
+        "--compressed",
+        "--max-time", str(int(timeout)),
+        url,
+    ]
+    p = subprocess.run(cmd, capture_output=True, text=True)
+    if p.returncode != 0:
+        raise RuntimeError(f"curl failed: {p.stderr.strip()}")
+    return p.stdout
+
+
+def fetch_html(url: str, timeout: float = 25.0) -> str:
+    """Fetch a URL as text, retrying through system curl if the Python TLS path fails."""
+    try:
+        return _fetch_via_httpx(url, timeout)
+    except Exception:
+        return _fetch_via_curl(url, timeout)
+
+
 class WcqClient:
     def __init__(
         self,
@@ -86,53 +138,7 @@ class WcqClient:
                         url=url,
                     )
 
-            headers = {
-                "User-Agent": "hkust-timetable-optimizer/0.1 (personal project; respectful caching)",
-                "Accept": "text/html,application/xhtml+xml",
-            }
-
-            def fetch_via_httpx() -> str:
-                # Force TLS 1.2 (some servers/network paths choke on TLS 1.3)
-                ctx = ssl.create_default_context()
-                ctx.minimum_version = ssl.TLSVersion.TLSv1_2
-                ctx.maximum_version = ssl.TLSVersion.TLSv1_2
-                ctx.load_verify_locations(certifi.where())
-
-                transport = httpx.HTTPTransport(retries=3, http1=True, http2=False)
-
-                with httpx.Client(
-                    timeout=httpx.Timeout(25.0, connect=15.0),
-                    headers=headers,
-                    verify=ctx,
-                    follow_redirects=True,
-                    transport=transport,
-                ) as client:
-                    resp = client.get(url)
-                    resp.raise_for_status()
-                    return resp.text
-
-            def fetch_via_curl() -> str:
-                # Fallback to system curl (uses macOS TLS stack)
-                cmd = [
-                    "curl", "-L",
-                    "--fail",
-                    "--silent",
-                    "--show-error",
-                    "--compressed",
-                    "--max-time", "25",
-                    url,
-                ]
-                p = subprocess.run(cmd, capture_output=True, text=True)
-                if p.returncode != 0:
-                    raise RuntimeError(f"curl failed: {p.stderr.strip()}")
-                return p.stdout
-
-            try:
-                html = fetch_via_httpx()
-            except Exception as e:
-                # If Python TLS path fails, try curl
-                html = fetch_via_curl()
-
+            html = fetch_html(url)
 
             # Atomic-ish write
             tmp_path = html_path.with_suffix(".html.tmp")

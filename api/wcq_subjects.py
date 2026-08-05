@@ -2,58 +2,106 @@
 import json
 import os
 import re
-from typing import List
-import httpx
-from bs4 import BeautifulSoup
+import time
+from typing import List, Optional
+
+from wcq_client import fetch_html
 
 WCQ_BASE = "https://w5.ab.ust.hk/wcq/cgi-bin"
 
-# Path to static subjects list (fallback when network fails)
-STATIC_SUBJECTS_PATH = os.path.join(os.path.dirname(__file__), "static", "subjects.json")
+STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
+
+# Legacy term-independent list, kept as a last-resort fallback.
+STATIC_SUBJECTS_PATH = os.path.join(STATIC_DIR, "subjects.json")
+
+# A term's landing page links to every subject it offers.
+SUBJECT_LINK_RE = re.compile(r"/wcq/cgi-bin/(\d{4})/subject/([A-Z]{3,5})\b")
+
+CACHE_MAX_AGE_SEC = 12 * 60 * 60
+
+
+def _term_cache_path(term: str) -> str:
+    return os.path.join(STATIC_DIR, f"subjects_{term}.json")
+
+
+def _read_term_cache(term: str, max_age_sec: Optional[int]) -> List[str]:
+    """Read the per-term cache. Pass max_age_sec=None to accept it at any age."""
+    path = _term_cache_path(term)
+    if not os.path.exists(path):
+        return []
+    try:
+        with open(path, "r") as f:
+            data = json.load(f)
+    except Exception:
+        return []
+
+    if not isinstance(data, dict) or not isinstance(data.get("subjects"), list):
+        return []
+
+    if max_age_sec is not None:
+        try:
+            if time.time() - float(data.get("fetched_at")) > max_age_sec:
+                return []
+        except (TypeError, ValueError):
+            return []
+
+    return [str(s).upper() for s in data["subjects"] if str(s).strip()]
+
+
+def _write_term_cache(term: str, subjects: List[str]) -> None:
+    try:
+        os.makedirs(STATIC_DIR, exist_ok=True)
+        payload = {"fetched_at": time.time(), "subjects": subjects}
+        with open(_term_cache_path(term), "w") as f:
+            json.dump(payload, f, indent=2)
+    except Exception as e:
+        # A read-only or ephemeral filesystem must not break the request.
+        print(f"Warning: could not cache subjects for {term}: {e}")
 
 
 def _load_static_subjects() -> List[str]:
-    """Load subjects from static JSON file."""
+    """Load the legacy term-independent subjects list."""
     if os.path.exists(STATIC_SUBJECTS_PATH):
-        with open(STATIC_SUBJECTS_PATH, "r") as f:
-            return json.load(f)
+        try:
+            with open(STATIC_SUBJECTS_PATH, "r") as f:
+                return json.load(f)
+        except Exception:
+            return []
     return []
 
 
 def _fetch_subjects_from_wcq(term: str) -> List[str]:
-    """Fetch subjects list by scraping the WCQ website."""
-    url = f"{WCQ_BASE}/{term}/subject"
-    r = httpx.get(url, timeout=30, verify=False)  # disable SSL verification as fallback
-    r.raise_for_status()
+    """Scrape the term landing page for the subjects it offers."""
+    html = fetch_html(f"{WCQ_BASE}/{term}/", timeout=40.0)
 
-    soup = BeautifulSoup(r.text, "html.parser")
-    subjects = set()
-
-    # links look like .../subject/FINA, .../subject/COMP, etc
-    for a in soup.select('a[href*="/subject/"]'):
-        href = a.get("href", "")
-        m = re.search(r"/subject/([A-Z0-9]+)", href)
-        if m:
-            subjects.add(m.group(1))
-
+    # Only take links belonging to this term - the page also links to other terms.
+    subjects = {
+        subject for link_term, subject in SUBJECT_LINK_RE.findall(html) if link_term == term
+    }
     return sorted(subjects)
 
 
 def list_subjects(term: str) -> List[str]:
     """
-    Get list of subject codes for a term.
-    
-    Uses static subjects.json as primary source (fast, reliable).
-    Falls back to network fetch if static file is missing.
+    Get the list of subject codes offered in a term.
+
+    Prefers a fresh per-term cache, then a live scrape of WCQ, then a stale
+    cache, then the legacy term-independent list.
     """
-    # Primary: use static file (no network dependency)
-    static_subjects = _load_static_subjects()
-    if static_subjects:
-        return static_subjects
-    
-    # Fallback: try to fetch from WCQ website
+    cached = _read_term_cache(term, CACHE_MAX_AGE_SEC)
+    if cached:
+        return cached
+
     try:
-        return _fetch_subjects_from_wcq(term)
+        subjects = _fetch_subjects_from_wcq(term)
+        if subjects:
+            _write_term_cache(term, subjects)
+            return subjects
     except Exception as e:
-        print(f"Warning: Failed to fetch subjects from WCQ: {e}")
-        return []
+        print(f"Warning: failed to fetch subjects for {term} from WCQ: {e}")
+
+    stale = _read_term_cache(term, None)
+    if stale:
+        return stale
+
+    return _load_static_subjects()

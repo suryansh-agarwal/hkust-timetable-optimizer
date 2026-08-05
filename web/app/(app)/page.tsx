@@ -12,9 +12,12 @@ import { Toast } from "../components/Toast";
 
 const DAYS = ["Mo", "Tu", "We", "Th", "Fr"] as const;
 const TERM_OPTIONS = [
-  { value: "2530", label: "2026 Spring" },
+  { value: "2610", label: "2026 Fall" },
   { value: "2540", label: "2026 Summer" },
+  { value: "2530", label: "2026 Spring" },
 ] as const;
+
+const DEFAULT_TERM = "2610";
 
 // Time options for soft no-after (12:00–20:00 in 30-min steps)
 function genNoAfterTimes(): string[] {
@@ -206,7 +209,7 @@ export default function Home() {
   const supabase = useMemo(() => createClient(), []);
   const [email, setEmail] = useState("none");
   const [userId, setUserId] = useState<string | null>(null);
-  const [term, setTerm] = useState("2530");
+  const [term, setTerm] = useState<string>(DEFAULT_TERM);
   const [showHelp, setShowHelp] = useState(true);
   const [openHardInfo, setOpenHardInfo] = useState(false);
   const [openSoftInfo, setOpenSoftInfo] = useState(false);
@@ -1204,7 +1207,7 @@ export default function Home() {
             <div style={{ marginTop: 12, fontSize: 14, color: "#444", lineHeight: 1.5 }}>
               <div style={{ fontWeight: 700 }}>1) Choose a term</div>
               <div style={{ marginBottom: 10 }}>
-                Pick “2026 Spring” or “2026 Summer”. The label is just for clarity, but it loads the right term data behind the scenes.
+                Pick “2026 Fall”, “2026 Summer” or “2026 Spring”. The label is just for clarity, but it loads the right term data behind the scenes.
               </div>
 
               <div style={{ fontWeight: 700 }}>2) Add courses</div>

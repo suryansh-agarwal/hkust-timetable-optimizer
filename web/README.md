@@ -9,17 +9,20 @@ The app uses a static course index for fast client-side search. This avoids depe
 To generate/update the course index, run from the repository root:
 
 ```bash
-# Start the local backend first
-cd api && uvicorn main:app --reload --port 8000
+# Start the local backend first.
+# MINICATALOG_PATH is required: the backend reads these same index files to look
+# up lecture/lab matching rules, and /optimize/* returns 500 without it.
+cd api && MINICATALOG_PATH="../web/public/course-index/{term}.json" \
+  uvicorn main:app --reload --port 8000
 
 # Test the subjects endpoint (should return JSON with subjects array)
-curl -sS "http://127.0.0.1:8000/wcq/subjects?term=2530" | head
+curl -sS "http://127.0.0.1:8000/wcq/subjects?term=2610" | head
 
 # In another terminal, build the index
 python scripts/build_course_index.py \
-  --term 2530 \
+  --term 2610 \
   --api-base http://127.0.0.1:8000 \
-  --out web/public/course-index/2530.json
+  --out web/public/course-index/2610.json
 ```
 
 The script will:
@@ -32,12 +35,24 @@ The script will:
 
 ### Multiple Terms
 
-To support multiple terms, run the script for each term:
+Each term listed in `TERM_OPTIONS` (`web/app/(app)/page.tsx`) needs its own index file:
 
 ```bash
-python scripts/build_course_index.py --term 2530 --api-base http://127.0.0.1:8000 --out web/public/course-index/2530.json
+python scripts/build_course_index.py --term 2610 --api-base http://127.0.0.1:8000 --out web/public/course-index/2610.json
 python scripts/build_course_index.py --term 2540 --api-base http://127.0.0.1:8000 --out web/public/course-index/2540.json
+python scripts/build_course_index.py --term 2530 --api-base http://127.0.0.1:8000 --out web/public/course-index/2530.json
 ```
+
+### Adding a New Term
+
+HKUST term codes are `<2-digit intake year><term>`, where term is `10` Fall,
+`20` Winter, `30` Spring, `40` Summer — so 2610 is 2026-27 Fall. Check which
+terms are live at <https://w5.ab.ust.hk/wcq/cgi-bin/>, then:
+
+1. Build the index for the new term (above). `/wcq/subjects` scrapes the term's
+   own subject list, so newly-created subjects are picked up automatically.
+2. Add it to `TERM_OPTIONS` and set `DEFAULT_TERM` in `web/app/(app)/page.tsx`.
+3. Commit both the index JSON and `api/static/subjects_<term>.json`.
 
 ## Getting Started
 
