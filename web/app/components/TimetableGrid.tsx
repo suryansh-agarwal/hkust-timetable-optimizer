@@ -36,16 +36,29 @@ function getSubjectFromCode(courseCode: string) {
   return match ? match[0] : courseCode.trim().toUpperCase();
 }
 
+/**
+ * Each subject gets one hue, defined in globals.css. Fill, border and label are
+ * all derived from it, so dark mode only has to lighten the hue rather than
+ * restate three colours per subject.
+ */
+function blockColors(hueVar: string) {
+  return {
+    bg: `hsl(var(${hueVar}) / 0.16)`,
+    border: `hsl(var(${hueVar}) / 0.55)`,
+    text: `hsl(var(${hueVar}))`,
+  };
+}
+
 const SUBJECT_COLORS = [
-  { bg: "rgba(59, 130, 246, 0.16)", border: "rgba(59, 130, 246, 0.5)", text: "#1d4ed8" },
-  { bg: "rgba(16, 185, 129, 0.16)", border: "rgba(16, 185, 129, 0.5)", text: "#047857" },
-  { bg: "rgba(244, 63, 94, 0.16)", border: "rgba(244, 63, 94, 0.5)", text: "#be123c" },
-  { bg: "rgba(168, 85, 247, 0.16)", border: "rgba(168, 85, 247, 0.5)", text: "#7c3aed" },
-  { bg: "rgba(234, 88, 12, 0.16)", border: "rgba(234, 88, 12, 0.5)", text: "#c2410c" },
-  { bg: "rgba(14, 116, 144, 0.16)", border: "rgba(14, 116, 144, 0.5)", text: "#0e7490" },
-  { bg: "rgba(99, 102, 241, 0.16)", border: "rgba(99, 102, 241, 0.5)", text: "#4338ca" },
-  { bg: "rgba(245, 158, 11, 0.16)", border: "rgba(245, 158, 11, 0.5)", text: "#b45309" },
-];
+  "--sub-1",
+  "--sub-2",
+  "--sub-3",
+  "--sub-4",
+  "--sub-5",
+  "--sub-6",
+  "--sub-7",
+  "--sub-8",
+].map(blockColors);
 
 // simple overlap "lane" assignment per day
 function assignLanes<T extends Meeting>(meetings: T[]): { placed: (T & { lane: number })[]; laneCount: number } {
@@ -123,10 +136,10 @@ export function TimetableGrid(props: {
   }, [props.meetings]);
 
   return (
-    <div style={{ border: "1px solid #ddd", borderRadius: 12, overflow: "hidden" }}>
+    <div style={{ border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
       {/* header */}
-      <div style={{ display: "grid", gridTemplateColumns: `80px repeat(5, 1fr)`, background: "#fafafa", borderBottom: "1px solid #eee" }}>
-        <div style={{ padding: 10, fontWeight: 700, fontSize: 12, color: "#666" }}>Time</div>
+      <div style={{ display: "grid", gridTemplateColumns: `80px repeat(5, 1fr)`, background: "var(--surface-2)", borderBottom: "1px solid var(--border-subtle)" }}>
+        <div style={{ padding: 10, fontWeight: 700, fontSize: 12, color: "var(--text-muted)" }}>Time</div>
         {DAYS.map((d) => (
           <div key={d.key} style={{ padding: 10, fontWeight: 700 }}>{d.label}</div>
         ))}
@@ -134,12 +147,12 @@ export function TimetableGrid(props: {
 
       <div style={{ display: "grid", gridTemplateColumns: `80px repeat(5, 1fr)` }}>
         {/* time axis */}
-        <div style={{ position: "relative", height: gridHeight, borderRight: "1px solid #eee" }}>
+        <div style={{ position: "relative", height: gridHeight, borderRight: "1px solid var(--border-subtle)" }}>
           {Array.from({ length: endHour - startHour + 1 }).map((_, i) => {
             const hour = startHour + i;
             const y = (hour * 60 - startMin) * pxPerMin;
             return (
-              <div key={hour} style={{ position: "absolute", top: y - 8, left: 10, fontSize: 12, color: "#666" }}>
+              <div key={hour} style={{ position: "absolute", top: y - 8, left: 10, fontSize: 12, color: "var(--text-muted)" }}>
                 {hour.toString().padStart(2, "0")}:00
               </div>
             );
@@ -150,11 +163,11 @@ export function TimetableGrid(props: {
         {DAYS.map((d) => {
           const { placed, laneCount } = packed[d.key];
           return (
-            <div key={d.key} style={{ position: "relative", height: gridHeight, borderRight: d.key !== "Fr" ? "1px solid #eee" : undefined }}>
+            <div key={d.key} style={{ position: "relative", height: gridHeight, borderRight: d.key !== "Fr" ? "1px solid var(--border-subtle)" : undefined }}>
               {/* hour lines */}
               {Array.from({ length: endHour - startHour }).map((_, i) => {
                 const y = (i * 60) * pxPerMin;
-                return <div key={i} style={{ position: "absolute", top: y, left: 0, right: 0, height: 1, background: "#f1f1f1" }} />;
+                return <div key={i} style={{ position: "absolute", top: y, left: 0, right: 0, height: 1, background: "var(--border-faint)" }} />;
               })}
 
               {/* blocks */}
@@ -186,7 +199,7 @@ export function TimetableGrid(props: {
                       padding: 8,
                       fontSize: 12,
                       background: colors.bg,
-                      boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+                      boxShadow: "var(--shadow-sm)",
                       overflow: "hidden",
                     }}
                   >
@@ -260,22 +273,14 @@ export function CompareTimetableGrid(props: {
   const gridHeight = totalMin * pxPerMin;
 
   // Color schemes
-  const colorA = {
-    bg: "rgba(239, 68, 68, 0.15)",
-    border: "rgba(239, 68, 68, 0.4)",
-    text: "#b91c1c",
-  };
-  const colorB = {
-    bg: "rgba(59, 130, 246, 0.15)",
-    border: "rgba(59, 130, 246, 0.4)",
-    text: "#1d4ed8",
-  };
+  const colorA = blockColors("--cmp-a");
+  const colorB = blockColors("--cmp-b");
 
   return (
-    <div style={{ border: "1px solid #ddd", borderRadius: 12, overflow: "hidden" }}>
+    <div style={{ border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
       {/* header */}
-      <div style={{ display: "grid", gridTemplateColumns: `80px repeat(5, 1fr)`, background: "#fafafa", borderBottom: "1px solid #eee" }}>
-        <div style={{ padding: 10, fontWeight: 700, fontSize: 12, color: "#666" }}>Time</div>
+      <div style={{ display: "grid", gridTemplateColumns: `80px repeat(5, 1fr)`, background: "var(--surface-2)", borderBottom: "1px solid var(--border-subtle)" }}>
+        <div style={{ padding: 10, fontWeight: 700, fontSize: 12, color: "var(--text-muted)" }}>Time</div>
         {DAYS.map((d) => (
           <div key={d.key} style={{ padding: 10, fontWeight: 700 }}>{d.label}</div>
         ))}
@@ -283,12 +288,12 @@ export function CompareTimetableGrid(props: {
 
       <div style={{ display: "grid", gridTemplateColumns: `80px repeat(5, 1fr)` }}>
         {/* time axis */}
-        <div style={{ position: "relative", height: gridHeight, borderRight: "1px solid #eee" }}>
+        <div style={{ position: "relative", height: gridHeight, borderRight: "1px solid var(--border-subtle)" }}>
           {Array.from({ length: endHour - startHour + 1 }).map((_, i) => {
             const hour = startHour + i;
             const y = (hour * 60 - startMin) * pxPerMin;
             return (
-              <div key={hour} style={{ position: "absolute", top: y - 8, left: 10, fontSize: 12, color: "#666" }}>
+              <div key={hour} style={{ position: "absolute", top: y - 8, left: 10, fontSize: 12, color: "var(--text-muted)" }}>
                 {hour.toString().padStart(2, "0")}:00
               </div>
             );
@@ -299,11 +304,11 @@ export function CompareTimetableGrid(props: {
         {DAYS.map((d) => {
           const { placed, laneCount } = packed[d.key];
           return (
-            <div key={d.key} style={{ position: "relative", height: gridHeight, borderRight: d.key !== "Fr" ? "1px solid #eee" : undefined }}>
+            <div key={d.key} style={{ position: "relative", height: gridHeight, borderRight: d.key !== "Fr" ? "1px solid var(--border-subtle)" : undefined }}>
               {/* hour lines */}
               {Array.from({ length: endHour - startHour }).map((_, i) => {
                 const y = i * 60 * pxPerMin;
-                return <div key={i} style={{ position: "absolute", top: y, left: 0, right: 0, height: 1, background: "#f1f1f1" }} />;
+                return <div key={i} style={{ position: "absolute", top: y, left: 0, right: 0, height: 1, background: "var(--border-faint)" }} />;
               })}
 
               {/* blocks */}
@@ -339,7 +344,7 @@ export function CompareTimetableGrid(props: {
                       padding: 8,
                       fontSize: 12,
                       background: colors.bg,
-                      boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+                      boxShadow: "var(--shadow-sm)",
                       overflow: "hidden",
                       opacity,
                       transition: "opacity 0.15s ease-in-out",

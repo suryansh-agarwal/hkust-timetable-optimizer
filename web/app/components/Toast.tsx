@@ -22,6 +22,9 @@ export function Toast({ open, message, variant = "info", onClose }: ToastProps) 
 
   const isError = variant === "error";
   const background = isError ? "#7f1d1d" : "#1f2937";
+  // The toast keeps its own dark palette in both themes; a border gives it
+  // separation from the page when that page is already dark.
+  const borderColor = isError ? "#b91c1c" : "#374151";
 
   return (
     <div
@@ -33,6 +36,7 @@ export function Toast({ open, message, variant = "info", onClose }: ToastProps) 
         right: 16,
         zIndex: 9999,
         background,
+        border: `1px solid ${borderColor}`,
         color: "white",
         borderRadius: 10,
         padding: "12px 14px",

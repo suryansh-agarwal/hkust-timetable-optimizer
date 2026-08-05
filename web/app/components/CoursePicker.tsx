@@ -5,15 +5,15 @@ import { loadCourseIndex, searchCourseIndex, getIndexCacheStatus, CourseIndexEnt
 
 function IndexStatusBadge({ loading, error, ready, count }: Readonly<{ loading: boolean; error: string; ready: boolean; count: number }>) {
   if (loading) {
-    return <span style={{ fontSize: 12, color: "#666" }}>Loading index...</span>;
+    return <span style={{ fontSize: 12, color: "var(--text-muted)" }}>Loading index...</span>;
   }
   if (error) {
-    return <span style={{ fontSize: 12, color: "crimson" }} title={error}>⚠️ Index error</span>;
+    return <span style={{ fontSize: 12, color: "var(--danger)" }} title={error}>⚠️ Index error</span>;
   }
   if (ready) {
-    return <span style={{ fontSize: 12, color: "#22c55e" }}>✓ Index: {count.toLocaleString()} courses</span>;
+    return <span style={{ fontSize: 12, color: "var(--success)" }}>✓ Index: {count.toLocaleString()} courses</span>;
   }
-  return <span style={{ fontSize: 12, color: "#666" }}>Index not loaded</span>;
+  return <span style={{ fontSize: 12, color: "var(--text-muted)" }}>Index not loaded</span>;
 }
 
 export function CoursePicker(props: Readonly<{
@@ -85,11 +85,11 @@ export function CoursePicker(props: Readonly<{
   const indexReady = indexStatus.loaded;
 
   return (
-    <div style={{ border: "1px solid #ddd", borderRadius: 12, padding: 16 }}>
+    <div style={{ border: "1px solid var(--border)", borderRadius: 12, padding: 16 }}>
       <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Courses</h2>
 
       <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "center", flexWrap: "wrap" }}>
-        <div style={{ fontSize: 12, color: "#666" }}>Term: <b>{term}</b></div>
+        <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Term: <b>{term}</b></div>
         <IndexStatusBadge
           loading={indexLoading}
           error={indexStatus.error}
@@ -100,10 +100,10 @@ export function CoursePicker(props: Readonly<{
 
       {/* Index error details */}
       {indexStatus.error && (
-        <div style={{ marginTop: 8, padding: 10, background: "#fff5f5", borderRadius: 8, fontSize: 12, color: "crimson" }}>
+        <div style={{ marginTop: 8, padding: 10, background: "var(--danger-bg)", borderRadius: 8, fontSize: 12, color: "var(--danger)" }}>
           <div style={{ fontWeight: 600 }}>Could not load course index:</div>
           <div style={{ marginTop: 4 }}>{indexStatus.error}</div>
-          <div style={{ marginTop: 6, color: "#666" }}>
+          <div style={{ marginTop: 6, color: "var(--text-muted)" }}>
             Tip: Make sure the index file exists at <code>/course-index/{term}.json</code>
           </div>
         </div>
@@ -111,9 +111,9 @@ export function CoursePicker(props: Readonly<{
 
       {/* selected chips */}
       <div style={{ marginTop: 12 }}>
-        <div style={{ fontSize: 13, color: "#666" }}>Selected</div>
+        <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Selected</div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
-          {selected.length === 0 && <div style={{ color: "#999" }}>No courses selected.</div>}
+          {selected.length === 0 && <div style={{ color: "var(--text-faint)" }}>No courses selected.</div>}
           {selected.map((code) => (
             <div
               key={code}
@@ -121,10 +121,10 @@ export function CoursePicker(props: Readonly<{
                 display: "inline-flex",
                 alignItems: "center",
                 gap: 8,
-                border: "1px solid #e6e6e6",
+                border: "1px solid var(--border-subtle)",
                 borderRadius: 999,
                 padding: "6px 10px",
-                background: "#fafafa",
+                background: "var(--surface-2)",
                 fontSize: 13,
                 fontWeight: 600,
               }}
@@ -138,7 +138,7 @@ export function CoursePicker(props: Readonly<{
                   cursor: "pointer",
                   fontSize: 16,
                   lineHeight: "16px",
-                  color: "#666",
+                  color: "var(--text-muted)",
                 }}
                 aria-label={`Remove ${code}`}
                 title="Remove"
@@ -152,19 +152,19 @@ export function CoursePicker(props: Readonly<{
 
       {/* search */}
       <div style={{ marginTop: 14 }}>
-        <div style={{ fontSize: 13, color: "#666", marginBottom: 6 }}>Search and add courses</div>
+        <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 6 }}>Search and add courses</div>
         <div
           style={{
             display: "flex",
             alignItems: "center",
             gap: 8,
-            border: "1px solid #ddd",
+            border: "1px solid var(--border)",
             borderRadius: 10,
             padding: "8px 10px",
-            background: indexReady ? "white" : "#f7f7f7",
+            background: indexReady ? "var(--surface)" : "var(--surface-3)",
           }}
         >
-          <span style={{ fontSize: 14, color: "#666" }}>🔎</span>
+          <span style={{ fontSize: 14, color: "var(--text-muted)" }}>🔎</span>
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
@@ -173,7 +173,7 @@ export function CoursePicker(props: Readonly<{
             style={{ border: "none", outline: "none", width: "100%", background: "transparent" }}
           />
         </div>
-        <div style={{ marginTop: 6, fontSize: 12, color: "#888" }}>
+        <div style={{ marginTop: 6, fontSize: 12, color: "var(--text-subtle)" }}>
           Tip: Use course codes for the fastest results.
         </div>
 
@@ -183,26 +183,26 @@ export function CoursePicker(props: Readonly<{
             marginTop: 10,
             maxHeight: 320,
             overflow: "auto",
-            border: "1px solid #eee",
+            border: "1px solid var(--border-subtle)",
             borderRadius: 10,
-            background: "white",
+            background: "var(--surface)",
           }}
         >
           {!indexReady && !indexStatus.error && !indexLoading && (
-            <div style={{ padding: 12, color: "#999" }}>
+            <div style={{ padding: 12, color: "var(--text-faint)" }}>
               Index not loaded yet.
             </div>
           )}
           {indexLoading && (
-            <div style={{ padding: 12, color: "#777" }}>Loading course index...</div>
+            <div style={{ padding: 12, color: "var(--text-muted)" }}>Loading course index...</div>
           )}
           {indexReady && q.trim() === "" && (
-            <div style={{ padding: 12, color: "#999" }}>
+            <div style={{ padding: 12, color: "var(--text-faint)" }}>
               Start typing to search courses.
             </div>
           )}
           {indexReady && q.trim() !== "" && results.length === 0 && (
-            <div style={{ padding: 12, color: "#999" }}>
+            <div style={{ padding: 12, color: "var(--text-faint)" }}>
               No results found.
             </div>
           )}
@@ -218,7 +218,7 @@ export function CoursePicker(props: Readonly<{
             else matchingLabel = "Matching req.";
           }
           return (
-            <div key={c.course_code} style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: 10, borderBottom: "1px solid #f3f3f3" }}>
+            <div key={c.course_code} style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: 10, borderBottom: "1px solid var(--border-faint)" }}>
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontWeight: 800 }}>
                   {c.course_code}
@@ -228,8 +228,8 @@ export function CoursePicker(props: Readonly<{
                         marginLeft: 8,
                         fontSize: 10,
                         fontWeight: 600,
-                        background: "#fef3c7",
-                        color: "#92400e",
+                        background: "var(--warn-bg)",
+                        color: "var(--warn-text)",
                         padding: "2px 6px",
                         borderRadius: 4,
                       }}
@@ -239,8 +239,8 @@ export function CoursePicker(props: Readonly<{
                     </span>
                   )}
                 </div>
-                <div style={{ fontSize: 12, color: "#666", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.title}</div>
-                <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>
+                <div style={{ fontSize: 12, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.title}</div>
+                <div style={{ fontSize: 11, color: "var(--text-subtle)", marginTop: 2 }}>
                   {c.subject ? `${c.subject} • ` : ""}{c.units ?? "-"} units
                 </div>
               </div>
@@ -250,8 +250,8 @@ export function CoursePicker(props: Readonly<{
                 style={{
                   padding: "6px 10px",
                   borderRadius: 10,
-                  border: "1px solid #ddd",
-                  background: on ? "#eef7ff" : "white",
+                  border: "1px solid var(--border)",
+                  background: on ? "var(--selected-bg)" : "var(--surface)",
                   fontWeight: 700,
                   cursor: "pointer",
                   flexShrink: 0,

@@ -30,7 +30,7 @@ export function InfoModal({ open, title, children, onClose }: InfoModalProps) {
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(0,0,0,0.35)",
+        background: "var(--overlay)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -41,14 +41,14 @@ export function InfoModal({ open, title, children, onClose }: InfoModalProps) {
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: "white",
+          background: "var(--surface)",
           borderRadius: 12,
           padding: 16,
           width: "100%",
           maxWidth: 480,
           maxHeight: "90vh",
           overflowY: "auto",
-          boxShadow: "0 12px 30px rgba(0,0,0,0.2)",
+          boxShadow: "var(--shadow-lg)",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
@@ -62,14 +62,14 @@ export function InfoModal({ open, title, children, onClose }: InfoModalProps) {
               background: "transparent",
               fontSize: 20,
               cursor: "pointer",
-              color: "#666",
+              color: "var(--text-muted)",
               lineHeight: 1,
             }}
           >
             ×
           </button>
         </div>
-        <div style={{ marginTop: 10, fontSize: 14, color: "#444", lineHeight: 1.5 }}>{children}</div>
+        <div style={{ marginTop: 10, fontSize: 14, color: "var(--text-body)", lineHeight: 1.5 }}>{children}</div>
       </div>
     </div>
   );
@@ -90,9 +90,9 @@ export function InfoIconButton({ onClick }: InfoIconButtonProps) {
         width: 20,
         height: 20,
         borderRadius: "50%",
-        border: "1px solid #ccc",
-        color: "#555",
-        background: "#fff",
+        border: "1px solid var(--border)",
+        color: "var(--text-body)",
+        background: "var(--surface)",
         fontSize: 12,
         fontWeight: 700,
         display: "inline-flex",
@@ -102,10 +102,10 @@ export function InfoIconButton({ onClick }: InfoIconButtonProps) {
         lineHeight: 1,
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.background = "#f5f5f5";
+        e.currentTarget.style.background = "var(--surface-2)";
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.background = "#fff";
+        e.currentTarget.style.background = "var(--surface)";
       }}
     >
       i

@@ -42,18 +42,18 @@ function RequestAccessContent() {
         display: "grid",
         placeItems: "center",
         padding: 24,
-        background: "linear-gradient(135deg, #f7f9fc 0%, #eef2f8 100%)",
+        background: "var(--login-canvas)",
       }}
     >
       <div
         style={{
           width: "100%",
           maxWidth: 560,
-          background: "white",
+          background: "var(--surface)",
           borderRadius: 16,
           padding: 28,
-          boxShadow: "0 20px 40px rgba(15, 23, 42, 0.12)",
-          border: "1px solid #e5e7eb",
+          boxShadow: "var(--shadow-lg)",
+          border: "1px solid var(--border)",
           textAlign: "center",
         }}
       >
@@ -62,10 +62,10 @@ function RequestAccessContent() {
             width: 56,
             height: 56,
             borderRadius: 16,
-            background: "#0f172a",
+            background: "var(--login-badge)",
             display: "grid",
             placeItems: "center",
-            color: "white",
+            color: "var(--accent-fg)",
             fontWeight: 800,
             fontSize: 22,
             margin: "0 auto",
@@ -75,24 +75,24 @@ function RequestAccessContent() {
           ✓
         </div>
         <h1 style={{ margin: "16px 0 6px", fontSize: 26, fontWeight: 800 }}>Access pending</h1>
-        <div style={{ color: "#6b7280", fontSize: 14 }}>
+        <div style={{ color: "var(--text-muted)", fontSize: 14 }}>
           You’re signed in, but not on the early-access list yet.
         </div>
 
         <div
           style={{
             marginTop: 18,
-            border: "1px solid #e5e7eb",
+            border: "1px solid var(--border)",
             borderRadius: 12,
             padding: 14,
-            background: "#f9fafb",
+            background: "var(--surface-2)",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
             gap: 10,
           }}
         >
-          <div style={{ fontWeight: 700, color: "#111827", fontSize: 14 }}>
+          <div style={{ fontWeight: 700, color: "var(--text-strong)", fontSize: 14 }}>
             {email || "your email"}
           </div>
           <button
@@ -104,15 +104,15 @@ function RequestAccessContent() {
             style={{
               padding: "8px 12px",
               borderRadius: 10,
-              border: "1px solid #0f172a",
-              background: hoverPrimary ? "#0f172a" : "white",
-              color: hoverPrimary ? "white" : "#0f172a",
+              border: "1px solid var(--accent)",
+              background: hoverPrimary ? "var(--accent)" : "var(--surface)",
+              color: hoverPrimary ? "var(--accent-fg)" : "var(--accent)",
               fontWeight: 700,
               fontSize: 12,
               cursor: "pointer",
               transition: "transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, color 0.15s ease",
               transform: hoverPrimary ? "translateY(-1px)" : "translateY(0)",
-              boxShadow: hoverPrimary ? "0 8px 16px rgba(15, 23, 42, 0.12)" : "none",
+              boxShadow: hoverPrimary ? "var(--shadow-md)" : "none",
               opacity: email ? 1 : 0.5,
             }}
           >
@@ -120,16 +120,16 @@ function RequestAccessContent() {
           </button>
         </div>
 
-        <div style={{ marginTop: 18, fontSize: 14, color: "#374151" }}>
+        <div style={{ marginTop: 18, fontSize: 14, color: "var(--text-body)" }}>
           Send this email to the admin to request access.
         </div>
-        <div style={{ marginTop: 6, fontSize: 13, color: "#6b7280" }}>
+        <div style={{ marginTop: 6, fontSize: 13, color: "var(--text-muted)" }}>
           You’ll be approved quickly once verified.
         </div>
 
-        <div style={{ marginTop: 18, fontSize: 13, color: "#6b7280" }}>
+        <div style={{ marginTop: 18, fontSize: 13, color: "var(--text-muted)" }}>
           Need to switch accounts?{" "}
-          <a href="/login" style={{ color: "#0f172a", fontWeight: 700, textDecoration: "none" }}>
+          <a href="/login" style={{ color: "var(--accent)", fontWeight: 700, textDecoration: "none" }}>
             Back to login
           </a>
         </div>

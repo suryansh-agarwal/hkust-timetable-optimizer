@@ -481,7 +481,7 @@ export default function Home() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <div>
           <h1 style={{ fontSize: 28, fontWeight: 700, margin: 0 }}>HKUST Timetable Optimizer</h1>
-          <div style={{ marginTop: 4, fontSize: 13, color: "#666" }}>
+          <div style={{ marginTop: 4, fontSize: 13, color: "var(--text-muted)" }}>
             Build a schedule with soft and hard preferences
           </div>
           <div><b>Logged in as:</b> {email}</div>
@@ -492,8 +492,8 @@ export default function Home() {
             target="_blank"
             rel="noreferrer"
             style={{
-              border: "1px solid #ddd",
-              background: "white",
+              border: "1px solid var(--border)",
+              background: "var(--surface)",
               borderRadius: 10,
               padding: "8px 12px",
               fontSize: 13,
@@ -519,8 +519,8 @@ export default function Home() {
             type="button"
             onClick={() => setShowHelp(true)}
             style={{
-              border: "1px solid #ddd",
-              background: "white",
+              border: "1px solid var(--border)",
+              background: "var(--surface)",
               borderRadius: 10,
               padding: "8px 12px",
               fontSize: 13,
@@ -536,8 +536,8 @@ export default function Home() {
             disabled={loading || selectedCourses.length === 0}
             style={{
               border: "none",
-              background: "#003366",
-              color: "white",
+              background: "var(--accent)",
+              color: "var(--accent-fg)",
               borderRadius: 10,
               padding: "8px 12px",
               fontSize: 13,
@@ -546,10 +546,10 @@ export default function Home() {
               opacity: loading || selectedCourses.length === 0 ? 0.6 : 1,
             }}
             onMouseEnter={(e) => {
-              if (!loading && selectedCourses.length > 0) e.currentTarget.style.background = "#0a3a66";
+              if (!loading && selectedCourses.length > 0) e.currentTarget.style.background = "var(--accent-hover)";
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = "#003366";
+              e.currentTarget.style.background = "var(--accent)";
             }}
           >
             {loading ? "Optimizing..." : "Optimize"}
@@ -557,7 +557,7 @@ export default function Home() {
         </div>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
-        <div style={{ border: "1px solid #ddd", borderRadius: 12, padding: 14 }}>
+        <div style={{ border: "1px solid var(--border)", borderRadius: 12, padding: 14 }}>
           <div style={{ marginBottom: 10 }}>
             <label htmlFor="term-select" style={{ display: "block", fontSize: 14, marginBottom: 6 }}>
               Term
@@ -586,11 +586,11 @@ export default function Home() {
           </div>
         </div>
 
-        <div style={{ border: "1px solid #ddd", borderRadius: 12, padding: 14, maxHeight: 520, overflowY: "auto" }}>
+        <div style={{ border: "1px solid var(--border)", borderRadius: 12, padding: 14, maxHeight: 520, overflowY: "auto" }}>
           <h2 style={{ fontSize: 18, fontWeight: 600 }}>Preferences</h2>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 10 }}>
-            <div style={{ border: "1px solid #eee", borderRadius: 10, padding: 12, background: "#fafafa" }}>
+            <div style={{ border: "1px solid var(--border-subtle)", borderRadius: 10, padding: 12, background: "var(--surface-2)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, fontWeight: 700, marginBottom: 8 }}>
                 <span>Hard preferences</span>
                 <InfoIconButton onClick={() => setOpenHardInfo(true)} />
@@ -686,7 +686,7 @@ export default function Home() {
               </div>
             </div>
 
-            <div style={{ border: "1px solid #eee", borderRadius: 10, padding: 12 }}>
+            <div style={{ border: "1px solid var(--border-subtle)", borderRadius: 10, padding: 12 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, fontWeight: 700, marginBottom: 8 }}>
                 <span>Soft preferences</span>
                 <InfoIconButton onClick={() => setOpenSoftInfo(true)} />
@@ -788,7 +788,7 @@ export default function Home() {
           <div style={{ marginTop: 14 }}>
             <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>Weights & style</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#333" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text-body)" }}>
                 <span style={{ width: 140 }}>Gap penalty:</span>
                 <select
                   value={gapWeightPreset}
@@ -800,7 +800,7 @@ export default function Home() {
                   <option value="High">High</option>
                 </select>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#333" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text-body)" }}>
                 <span style={{ width: 140 }}>Early/late penalty:</span>
                 <select
                   value={earlyLateWeightPreset}
@@ -812,7 +812,7 @@ export default function Home() {
                   <option value="High">High</option>
                 </select>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#333" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text-body)" }}>
                 <span style={{ width: 140 }}>Gap shape:</span>
                 <select
                   value={gapShape}
@@ -826,7 +826,7 @@ export default function Home() {
               </div>
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10, fontSize: 13, color: "#333" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10, fontSize: 13, color: "var(--text-body)" }}>
               <label style={{ display: "flex", gap: 10, alignItems: "center" }}>
                 <input type="checkbox" checked={preferOneFreeDay} onChange={(e) => setPreferOneFreeDay(e.target.checked)} />
                 Prefer at least one free weekday
@@ -834,7 +834,7 @@ export default function Home() {
             </div>
           </div>
 
-          {error && <div style={{ marginTop: 8, color: "crimson", whiteSpace: "pre-wrap" }}>{error}</div>}
+          {error && <div style={{ marginTop: 8, color: "var(--danger)", whiteSpace: "pre-wrap" }}>{error}</div>}
         </div>
       </div>
 
@@ -860,11 +860,11 @@ export default function Home() {
       </InfoModal>
       <div ref={resultsRef} id="results" style={{ scrollMarginTop: 90 }}>
         {result && (
-          <div style={{ marginTop: 14, border: "1px solid #ddd", borderRadius: 12, padding: 14 }}>
+          <div style={{ marginTop: 14, border: "1px solid var(--border)", borderRadius: 12, padding: 14 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
             <div>
               <div style={{ fontWeight: 700 }}>Results</div>
-              <div style={{ fontSize: 13, color: "#666" }}>
+              <div style={{ fontSize: 13, color: "var(--text-muted)" }}>
                 considered {result.considered}, returned {result.returned}
               </div>
             </div>
@@ -888,11 +888,11 @@ export default function Home() {
                     position: "relative",
                     textAlign: "left",
                     borderRadius: 14,
-                    border: isActive ? "2px solid #111" : "1px solid #ddd",
-                    background: "white",
+                    border: isActive ? "2px solid var(--active-border)" : "1px solid var(--border)",
+                    background: "var(--surface)",
                     padding: 12,
                     cursor: "pointer",
-                    boxShadow: isActive ? "0 2px 10px rgba(0,0,0,0.08)" : "none",
+                    boxShadow: isActive ? "var(--shadow-md)" : "none",
                   }}
                   onClick={() => setActiveIdx(i)}
                   onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setActiveIdx(i); }}
@@ -910,14 +910,14 @@ export default function Home() {
                           pinResultOption(r, i);
                         }}
                         style={{
-                          border: isPinned ? "1px solid #1d4ed8" : "1px solid #ddd",
-                          background: isPinned ? "#e0ecff" : "#fafafa",
+                          border: isPinned ? "1px solid var(--pin-border)" : "1px solid var(--border)",
+                          background: isPinned ? "var(--pin-bg)" : "var(--surface-2)",
                           borderRadius: 8,
                           padding: "4px 8px",
                           fontSize: 11,
                           fontWeight: 700,
                           cursor: "pointer",
-                          color: isPinned ? "#1d4ed8" : "#111",
+                          color: isPinned ? "var(--pin-text)" : "var(--text-strong)",
                         }}
                         title={isPinned ? "Pinned" : "Pin this option for comparison"}
                       >
@@ -926,7 +926,7 @@ export default function Home() {
                     </div>
                   </div>
 
-                  <div style={{ marginTop: 8, fontSize: 13, color: "#444", lineHeight: 1.35 }}>
+                  <div style={{ marginTop: 8, fontSize: 13, color: "var(--text-body)", lineHeight: 1.35 }}>
                     <div>
                       Free days: <b>{stats.freeDaysCount}</b> ({formatDayList(stats.freeDays)})
                     </div>
@@ -950,8 +950,8 @@ export default function Home() {
                           fontSize: 12,
                           padding: "4px 8px",
                           borderRadius: 999,
-                          background: "#fff1f1",
-                          border: "1px solid #ffd6d6",
+                          background: "var(--danger-chip-bg)",
+                          border: "1px solid var(--danger-border)",
                         }}
                         title={JSON.stringify(p)}
                       >
@@ -965,8 +965,8 @@ export default function Home() {
                           fontSize: 12,
                           padding: "4px 8px",
                           borderRadius: 999,
-                          background: "#f1fff3",
-                          border: "1px solid #c9f3d0",
+                          background: "var(--success-bg)",
+                          border: "1px solid var(--success-border)",
                         }}
                         title={JSON.stringify(b)}
                       >
@@ -974,7 +974,7 @@ export default function Home() {
                       </span>
                     ))}
                     {penalties.length === 0 && bonuses.length === 0 && (
-                      <span style={{ fontSize: 12, color: "#777" }}>No notable tradeoffs</span>
+                      <span style={{ fontSize: 12, color: "var(--text-muted)" }}>No notable tradeoffs</span>
                     )}
                   </div>
                 </div>
@@ -984,7 +984,7 @@ export default function Home() {
 
           <div style={{ marginTop: 8, display: "flex", gap: 12, flexWrap: "wrap" }}>
             <div style={{ fontWeight: 700 }}>Score: {active?.score.toFixed(1)}</div>
-            <div style={{ fontSize: 13, color: "#555" }}>
+            <div style={{ fontSize: 13, color: "var(--text-body)" }}>
               {(active?.breakdown?.penalties as { type: string }[] | undefined)?.map((p, idx: number) => (
                 <span key={idx} style={{ marginRight: 8 }}>❌ {p.type}</span>
               ))}
@@ -1000,15 +1000,15 @@ export default function Home() {
           </div>
 
           {/* ---- Compare Section ---- */}
-          <div style={{ marginTop: 20, borderTop: "1px solid #eee", paddingTop: 16 }}>
+          <div style={{ marginTop: 20, borderTop: "1px solid var(--border-subtle)", paddingTop: 16 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
               <div>
                 <div style={{ fontWeight: 700, fontSize: 16 }}>Compare Timetables</div>
-                <div style={{ fontSize: 13, color: "#666" }}>
+                <div style={{ fontSize: 13, color: "var(--text-muted)" }}>
                   Pin options above, then select two to overlay and compare
                 </div>
               </div>
-              <div style={{ fontSize: 13, color: "#888" }}>{pinned.length} pinned</div>
+              <div style={{ fontSize: 13, color: "var(--text-subtle)" }}>{pinned.length} pinned</div>
             </div>
 
             {/* Pinned items list */}
@@ -1021,10 +1021,10 @@ export default function Home() {
                       display: "flex",
                       alignItems: "center",
                       gap: 6,
-                      border: "1px solid #e6e6e6",
+                      border: "1px solid var(--border-subtle)",
                       borderRadius: 8,
                       padding: "6px 10px",
-                      background: "#fafafa",
+                      background: "var(--surface-2)",
                       fontSize: 13,
                     }}
                   >
@@ -1040,7 +1040,7 @@ export default function Home() {
                         fontSize: 13,
                       }}
                     />
-                    <span style={{ fontSize: 12, color: "#888" }}>{p.score.toFixed(1)}</span>
+                    <span style={{ fontSize: 12, color: "var(--text-subtle)" }}>{p.score.toFixed(1)}</span>
                     <button
                       type="button"
                       onClick={() => unpin(p.id)}
@@ -1049,7 +1049,7 @@ export default function Home() {
                         background: "transparent",
                         cursor: "pointer",
                         fontSize: 14,
-                        color: "#999",
+                        color: "var(--text-faint)",
                         padding: 0,
                         lineHeight: 1,
                       }}
@@ -1072,8 +1072,8 @@ export default function Home() {
                       width: 12,
                       height: 12,
                       borderRadius: 3,
-                      background: "rgba(239, 68, 68, 0.3)",
-                      border: "1px solid rgba(239, 68, 68, 0.5)",
+                      background: "hsl(var(--cmp-a) / 0.3)",
+                      border: "1px solid hsl(var(--cmp-a) / 0.6)",
                     }}
                   />
                   <label htmlFor="compare-a" style={{ fontSize: 13, fontWeight: 600 }}>Option A:</label>
@@ -1096,8 +1096,8 @@ export default function Home() {
                       width: 12,
                       height: 12,
                       borderRadius: 3,
-                      background: "rgba(59, 130, 246, 0.3)",
-                      border: "1px solid rgba(59, 130, 246, 0.5)",
+                      background: "hsl(var(--cmp-b) / 0.3)",
+                      border: "1px solid hsl(var(--cmp-b) / 0.6)",
                     }}
                   />
                   <label htmlFor="compare-b" style={{ fontSize: 13, fontWeight: 600 }}>Option B:</label>
@@ -1119,7 +1119,7 @@ export default function Home() {
             {/* Overlay comparison grid */}
             {(pinnedA || pinnedB) && (
               <div style={{ marginTop: 14 }}>
-                <div style={{ fontSize: 12, color: "#666", marginBottom: 8 }}>
+                <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 8 }}>
                   Hover over a class to temporarily hide the other timetable
                 </div>
                 <CompareTimetableGrid
@@ -1132,7 +1132,7 @@ export default function Home() {
             )}
 
             {pinned.length < 2 && (
-              <div style={{ marginTop: 12, fontSize: 13, color: "#888", fontStyle: "italic" }}>
+              <div style={{ marginTop: 12, fontSize: 13, color: "var(--text-subtle)", fontStyle: "italic" }}>
                 Pin at least 2 options to enable comparison
               </div>
             )}
@@ -1151,7 +1151,7 @@ export default function Home() {
               position: "fixed",
               inset: 0,
               border: "none",
-              background: "rgba(0, 0, 0, 0.35)",
+              background: "var(--overlay)",
               padding: 0,
               margin: 0,
               zIndex: 40,
@@ -1177,14 +1177,14 @@ export default function Home() {
           >
             <div
               style={{
-                background: "white",
+                background: "var(--surface)",
                 borderRadius: 14,
                 padding: 20,
                 width: "100%",
                 maxWidth: 760,
                 maxHeight: "85vh",
                 overflowY: "auto",
-                boxShadow: "0 12px 30px rgba(0,0,0,0.2)",
+                boxShadow: "var(--shadow-lg)",
               }}
             >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
@@ -1198,13 +1198,13 @@ export default function Home() {
                   background: "transparent",
                   fontSize: 20,
                   cursor: "pointer",
-                  color: "#666",
+                  color: "var(--text-muted)",
                 }}
               >
                 ×
               </button>
             </div>
-            <div style={{ marginTop: 12, fontSize: 14, color: "#444", lineHeight: 1.5 }}>
+            <div style={{ marginTop: 12, fontSize: 14, color: "var(--text-body)", lineHeight: 1.5 }}>
               <div style={{ fontWeight: 700 }}>1) Choose a term</div>
               <div style={{ marginBottom: 10 }}>
                 Pick “2026 Fall”, “2026 Summer” or “2026 Spring”. The label is just for clarity, but it loads the right term data behind the scenes.
@@ -1233,7 +1233,7 @@ export default function Home() {
 
               <div style={{ fontWeight: 700 }}>6) P.S.</div>
               <div style={{ marginBottom: 10 }}>
-                This is a work in progress. Please report any issues or feedback to google form on the top right. Also, dark mode is not supported yet.
+                This is a work in progress. Please report any issues or feedback to google form on the top right. The app follows your system light or dark theme.
               </div>
             </div>
           </div>

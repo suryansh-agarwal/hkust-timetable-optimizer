@@ -73,18 +73,18 @@ function LoginContent() {
         display: "grid",
         placeItems: "center",
         padding: 24,
-        background: "linear-gradient(135deg, #f7f9fc 0%, #eef2f8 100%)",
+        background: "var(--login-canvas)",
       }}
     >
       <div
         style={{
           width: "100%",
           maxWidth: 520,
-          background: "white",
+          background: "var(--surface)",
           borderRadius: 16,
           padding: 28,
-          boxShadow: "0 20px 40px rgba(15, 23, 42, 0.12)",
-          border: "1px solid #e5e7eb",
+          boxShadow: "var(--shadow-lg)",
+          border: "1px solid var(--border)",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -93,10 +93,10 @@ function LoginContent() {
               width: 44,
               height: 44,
               borderRadius: 12,
-              background: "#0f172a",
+              background: "var(--login-badge)",
               display: "grid",
               placeItems: "center",
-              color: "white",
+              color: "var(--accent-fg)",
               fontWeight: 800,
               fontSize: 18,
             }}
@@ -110,7 +110,7 @@ function LoginContent() {
           </div>
           <div>
             <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800 }}>Welcome back</h1>
-            <div style={{ color: "#6b7280", marginTop: 4, fontSize: 14 }}>
+            <div style={{ color: "var(--text-muted)", marginTop: 4, fontSize: 14 }}>
               Sign in to build your best timetable
             </div>
           </div>
@@ -126,9 +126,9 @@ function LoginContent() {
               width: "100%",
               padding: "12px 14px",
               borderRadius: 12,
-              border: "1px solid #e5e7eb",
-              background: hoverPrimary ? "#111827" : "#0f172a",
-              color: "white",
+              border: "1px solid var(--border)",
+              background: hoverPrimary ? "var(--accent-hover)" : "var(--accent)",
+              color: "var(--accent-fg)",
               fontWeight: 700,
               fontSize: 14,
               cursor: "pointer",
@@ -138,7 +138,7 @@ function LoginContent() {
               gap: 10,
               transition: "transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease",
               transform: hoverPrimary ? "translateY(-1px)" : "translateY(0)",
-              boxShadow: hoverPrimary ? "0 10px 20px rgba(15, 23, 42, 0.2)" : "none",
+              boxShadow: hoverPrimary ? "var(--shadow-lg)" : "none",
             }}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>
@@ -154,15 +154,15 @@ function LoginContent() {
               display: "flex",
               alignItems: "center",
               gap: 12,
-              color: "#6b7280",
+              color: "var(--text-muted)",
               fontSize: 12,
               fontWeight: 700,
             }}
             aria-hidden
           >
-            <div style={{ flex: 1, height: 1, background: "#e5e7eb" }} />
+            <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
             <span>--- Or ---</span>
-            <div style={{ flex: 1, height: 1, background: "#e5e7eb" }} />
+            <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
           </div>
           <form onSubmit={continueWithEmail} style={{ display: "grid", gap: 10 }}>
             <input
@@ -175,7 +175,7 @@ function LoginContent() {
                 width: "100%",
                 padding: "12px 14px",
                 borderRadius: 12,
-                border: "1px solid #e5e7eb",
+                border: "1px solid var(--border)",
                 fontSize: 14,
                 fontWeight: 500,
                 outline: "none",
@@ -190,9 +190,9 @@ function LoginContent() {
                 width: "100%",
                 padding: "12px 14px",
                 borderRadius: 12,
-                border: "1px solid #e5e7eb",
-                background: hoverEmail ? "#f9fafb" : "white",
-                color: "#111827",
+                border: "1px solid var(--border)",
+                background: hoverEmail ? "var(--surface-2)" : "var(--surface)",
+                color: "var(--text-strong)",
                 fontWeight: 700,
                 fontSize: 14,
                 cursor: "pointer",
@@ -202,14 +202,14 @@ function LoginContent() {
                 gap: 10,
                 transition: "transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease",
                 transform: hoverEmail ? "translateY(-1px)" : "translateY(0)",
-                boxShadow: hoverEmail ? "0 10px 20px rgba(15, 23, 42, 0.2)" : "none",
+                boxShadow: hoverEmail ? "var(--shadow-lg)" : "none",
               }}
             >
               {loadingEmail ? "Sending..." : "Continue with email"}
             </button>
           </form>
-          {err && <div style={{ marginTop: 6, color: "#b91c1c", fontWeight: 600 }}>Error: {err}</div>}
-          {notice && <div style={{ marginTop: 6, color: "#2563eb", fontWeight: 600 }}>{notice}</div>}
+          {err && <div style={{ marginTop: 6, color: "var(--danger)", fontWeight: 600 }}>Error: {err}</div>}
+          {notice && <div style={{ marginTop: 6, color: "var(--pin-text)", fontWeight: 600 }}>{notice}</div>}
         </div>
 
       </div>
