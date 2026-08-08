@@ -69,6 +69,22 @@ available while still pinning the lecture, and it is why the rule is stated as
 `KU, Yin Bon` matches `KU, Yin Bon LEUNG, Shing Yu`. Since the dropdown offers
 the raw cell text as one entry, a combined entry also matches itself.
 
+**The lock must additionally be satisfiable.** Because `section_allows` lets
+unnamed sections through, a course can retain sections while the locked
+professor teaches none of them — every lecture filtered out, only `TBA` labs
+left. `build_bundles` has an early return for courses with no lectures that
+would then emit lab-only bundles, scheduling a course with no lecture at all.
+A second predicate guards this:
+
+```
+lock_is_satisfiable(instructors, lock):
+    at least one instructor is named AND contains the lock
+```
+
+If it fails, the course yields no bundles and the request is reported as
+blocked. This was found while writing the implementation plan, not during
+design.
+
 Worked examples:
 
 ```
