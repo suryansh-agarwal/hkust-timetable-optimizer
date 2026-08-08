@@ -460,9 +460,24 @@ def course_sections(term: str = Query(...), course_code: str = Query(...)):
     # internal whitespace, so "COMP  2011" resolves here exactly as it does in
     # the mini-catalog lookup below instead of 404ing.
     normalized = normalize_code(course_code)
-    course_map, subjects_fetched, cache_misses = _load_courses_with_cache(
-        term, [normalized], refresh=False, use_cache=True
-    )
+    try:
+        course_map, subjects_fetched, cache_misses = _load_courses_with_cache(
+            term, [normalized], refresh=False, use_cache=True
+        )
+    except ValueError as e:
+        # WcqClient validates the term and subject and raises ValueError. That
+        # is bad input, not a server fault, and it used to surface as a 500
+        # with a traceback for anything like "X 1000".
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        # The subject looked well-formed but could not be loaded - no such
+        # subject upstream, or WCQ is unreachable. Either way it is not a bug
+        # in this service.
+        raise HTTPException(
+            status_code=502,
+            detail=f"Could not load the catalogue for {normalized}: {e}",
+        )
+
     course = course_map.get(normalized)
     if not course:
         raise HTTPException(status_code=404, detail=f"Course not found: {course_code}")
