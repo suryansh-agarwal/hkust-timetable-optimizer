@@ -5,19 +5,6 @@ import { loadCourseIndex, searchCourseIndex, getIndexCacheStatus, getCourseFromI
 import type { CourseSections, SectionLock } from "@/lib/api";
 import { optionsFor, reconcilePins, matchingAppliesTo } from "@/lib/sectionOptions";
 
-function IndexStatusBadge({ loading, error, ready, count }: Readonly<{ loading: boolean; error: string; ready: boolean; count: number }>) {
-  if (loading) {
-    return <span style={{ fontSize: 12, color: "var(--text-muted)" }}>Loading index...</span>;
-  }
-  if (error) {
-    return <span style={{ fontSize: 12, color: "var(--danger)" }} title={error}>⚠️ Index error</span>;
-  }
-  if (ready) {
-    return <span style={{ fontSize: 12, color: "var(--success)" }}>✓ Index: {count.toLocaleString()} courses</span>;
-  }
-  return <span style={{ fontSize: 12, color: "var(--text-muted)" }}>Index not loaded</span>;
-}
-
 function samePins(a: SectionLock, b: SectionLock) {
   return a.lecture === b.lecture && a.tutorial === b.tutorial && a.lab === b.lab;
 }
@@ -40,9 +27,8 @@ export function CoursePicker(props: Readonly<{
   const { term, selected, setSelected, locks, setLocks, sectionLocks, setSectionLocks } = props;
 
   const [q, setQ] = useState("");
-  const [indexStatus, setIndexStatus] = useState<{ loaded: boolean; count: number; error: string }>({
+  const [indexStatus, setIndexStatus] = useState<{ loaded: boolean; error: string }>({
     loaded: false,
-    count: 0,
     error: "",
   });
   const [indexLoading, setIndexLoading] = useState(false);
@@ -94,16 +80,16 @@ export function CoursePicker(props: Readonly<{
 
     async function loadIndex() {
       setIndexLoading(true);
-      setIndexStatus({ loaded: false, count: 0, error: "" });
+      setIndexStatus({ loaded: false, error: "" });
 
       try {
-        const data = await loadCourseIndex(term);
+        await loadCourseIndex(term);
         if (cancelled) return;
-        setIndexStatus({ loaded: true, count: data.length, error: "" });
+        setIndexStatus({ loaded: true, error: "" });
       } catch (e: unknown) {
         if (cancelled) return;
         const errorMsg = e instanceof Error ? e.message : String(e);
-        setIndexStatus({ loaded: false, count: 0, error: errorMsg });
+        setIndexStatus({ loaded: false, error: errorMsg });
       } finally {
         if (!cancelled) setIndexLoading(false);
       }
@@ -112,7 +98,7 @@ export function CoursePicker(props: Readonly<{
     // Check if already cached
     const cached = getIndexCacheStatus(term);
     if (cached.loaded) {
-      setIndexStatus({ loaded: true, count: cached.count, error: "" });
+      setIndexStatus({ loaded: true, error: "" });
     } else {
       loadIndex();
     }
@@ -245,16 +231,6 @@ export function CoursePicker(props: Readonly<{
   return (
     <div style={{ border: "1px solid var(--border)", borderRadius: 12, padding: 16 }}>
       <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Courses</h2>
-
-      <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "center", flexWrap: "wrap" }}>
-        <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Term: <b>{term}</b></div>
-        <IndexStatusBadge
-          loading={indexLoading}
-          error={indexStatus.error}
-          ready={indexReady}
-          count={indexStatus.count}
-        />
-      </div>
 
       {/* Index error details */}
       {indexStatus.error && (
