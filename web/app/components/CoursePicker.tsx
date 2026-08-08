@@ -138,7 +138,13 @@ export function CoursePicker(props: Readonly<{
         requested.current.add(key);
         try {
           const data = await fetchCourseSections(term, code);
-          if (cancelled) return;
+          if (cancelled) {
+            // Cancelled before we could store the result. Un-mark so the next
+            // run retries; fetchCourseSections caches successes, so the retry
+            // resolves from memory without another network request.
+            requested.current.delete(key);
+            return;
+          }
           setSectionData((prev) => ({ ...prev, [key]: data }));
           setSectionFailed((prev) => {
             if (!prev[key]) return prev;
