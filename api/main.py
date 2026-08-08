@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 from fastapi import Body
 
 from bundles import build_bundles, MatchingConstraint
+from section_lock import has_pin
 from optimizer_bundles import BundleChoice, find_bundle_schedules, schedule_to_json as schedule_to_json_bundles
 
 from typing import Any, Optional, Dict, List, Literal
@@ -200,7 +201,7 @@ def _describe_lock(instructor_lock: Optional[str], section_lock: Optional[Dict[s
     """Human-readable summary of why a course was blocked, naming the pins."""
     parts = []
     if instructor_lock:
-        parts.append(f"taught by {instructor_lock}")
+        parts.append(f"professor {instructor_lock}")
     for key, label in (("lecture", "lecture"), ("tutorial", "tutorial"), ("lab", "lab")):
         value = (section_lock or {}).get(key)
         if value:
@@ -248,7 +249,7 @@ def optimize_ranked(req: OptimizeRankedRequest):
         lock = req.instructor_locks.get(cc)
         pins = req.section_locks.get(cc)
         bundles = build_bundles(course, constraint, instructor_lock=lock, section_lock=pins)
-        if not bundles and (lock or pins):
+        if not bundles and (lock or has_pin(pins)):
             blocked_by_lock.append(cc)
         choices.append(BundleChoice(course_code=cc, bundles=[b.parts for b in bundles]))
 
