@@ -5,7 +5,7 @@ from typing import List, Dict, Any, Optional
 
 from models import Course, Section
 from section_utils import section_type
-from instructor_filter import lock_is_satisfiable, section_allows
+from instructor_filter import lock_is_satisfiable, section_allows, normalise
 
 
 @dataclass
@@ -145,7 +145,12 @@ def build_bundles(
                     bundles.append(Bundle(course.course_code, parts))
 
     # If strict matching resulted in no bundles, log warning (shouldn't happen with valid data)
-    if not bundles and strict_matching:
+    # This fallback exists for inconsistent WCQ data (lecture/tutorial numbers
+    # that don't line up), not for a user-applied instructor lock. Under a
+    # lock, a broken numeric pairing means the course is unschedulable with
+    # that professor, not that we should fabricate a bundle missing a
+    # required tutorial/lab.
+    if not bundles and strict_matching and not normalise(instructor_lock):
         # Fallback: create what we can (this means the WCQ data is inconsistent)
         for lec in lecs:
             bundles.append(Bundle(course.course_code, [lec]))

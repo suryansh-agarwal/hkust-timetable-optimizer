@@ -131,3 +131,30 @@ def test_lock_matching_only_tba_sections_yields_no_bundles():
         ("LA2", "TBA"),
     ])
     assert build_bundles(course, MatchingConstraint(), instructor_lock="LI, Xin") == []
+
+
+def test_lock_that_breaks_numeric_pairing_does_not_fabricate_lectureless_bundle():
+    # L1/T1 and L2/T2 are the valid strict-matching pairs. Locking to LI, Xin
+    # keeps L1 (LI) but strips T1 (KELLER) out of the tutorial bucket, so no
+    # lecture can find its matching tutorial. The pre-fix inconsistent-data
+    # fallback would fabricate a lecture-only bundle for L1, silently handing
+    # back a timetable missing a required tutorial. Under a lock this must be
+    # reported as unschedulable instead.
+    course = make_course([
+        ("L1", "LI, Xin"),
+        ("L2", "KELLER, Wolfgang"),
+        ("T1", "KELLER, Wolfgang"),
+        ("T2", "LI, Xin"),
+    ])
+    constraint = MatchingConstraint(matching_required=True, matching_type="tutorial")
+
+    assert build_bundles(course, constraint, instructor_lock="LI, Xin") == []
+
+    # Without a lock, the fallback's target scenario doesn't even arise here:
+    # both lectures find their matching tutorial normally. This pins down
+    # that the fix only changes locked behavior, not the unlocked baseline.
+    unlocked = build_bundles(course, constraint)
+    assert {tuple(sorted(p.section for p in b.parts)) for b in unlocked} == {
+        ("L1", "T1"),
+        ("L2", "T2"),
+    }
