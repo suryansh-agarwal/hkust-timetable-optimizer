@@ -377,7 +377,9 @@ multi = [c for c in d if len(c.get('instructors') or []) > 1]
 print('courses:', len(d))
 print('with instructors:', len(withi))
 print('with 2+ names:', len(multi))
-assert len(d) == 1404, 'course count changed'
+# A range, not an equality: HKUST adds and withdraws courses during the term,
+# so the exact count drifts between rebuilds and is not a defect signal.
+assert 1350 < len(d) < 1500, 'course count outside the expected range'
 assert 1100 < len(withi) < 1200, 'unexpected named-instructor count'
 sample = next(c for c in d if c['course_code'] == 'COMP 1023')
 print('COMP 1023:', sample['instructors'])
