@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase/client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { optimizeRanked, Prefs } from "@/lib/api";
+import { optimizeRanked, Prefs, SectionLock } from "@/lib/api";
 import { TimetableGrid, CompareTimetableGrid } from "../components/TimetableGrid";
 import { CoursePicker } from "../components/CoursePicker";
 import { InfoIconButton, InfoModal } from "../components/InfoModal";
@@ -216,6 +216,7 @@ export default function Home() {
 
   const [selectedCourses, setSelectedCourses] = useState<string[]>([]);
   const [instructorLocks, setInstructorLocks] = useState<Record<string, string>>({});
+  const [sectionLocks, setSectionLocks] = useState<Record<string, SectionLock>>({});
   const [selectionsLoaded, setSelectionsLoaded] = useState(false);
 
   // A lock for a course that is no longer selected would be sent to the API
@@ -224,6 +225,13 @@ export default function Home() {
     setSelectedCourses(codes);
     setInstructorLocks((prev) => {
       const next: Record<string, string> = {};
+      for (const code of codes) {
+        if (prev[code]) next[code] = prev[code];
+      }
+      return next;
+    });
+    setSectionLocks((prev) => {
+      const next: Record<string, SectionLock> = {};
       for (const code of codes) {
         if (prev[code]) next[code] = prev[code];
       }
@@ -247,13 +255,14 @@ export default function Home() {
       if (!uid) {
         setSelectedCourses([]);
         setInstructorLocks({});
+        setSectionLocks({});
         setSelectionsLoaded(true);
         return;
       }
 
       const { data: row, error } = await supabase
         .from("user_course_selections")
-        .select("courses, instructor_locks")
+        .select("courses, instructor_locks, section_locks")
         .eq("user_id", uid)
         .eq("term", term)
         .maybeSingle();
@@ -264,9 +273,11 @@ export default function Home() {
         console.warn("Failed to load course selections", error);
         setSelectedCourses([]);
         setInstructorLocks({});
+        setSectionLocks({});
       } else {
         setSelectedCourses(row?.courses ?? []);
         setInstructorLocks(row?.instructor_locks ?? {});
+        setSectionLocks(row?.section_locks ?? {});
       }
 
       setSelectionsLoaded(true);
@@ -291,6 +302,7 @@ export default function Home() {
               term,
               courses: selectedCourses,
               instructor_locks: instructorLocks,
+              section_locks: sectionLocks,
               updated_at: new Date().toISOString(),
             },
             { onConflict: "user_id,term" }
@@ -303,7 +315,7 @@ export default function Home() {
     }, 400);
 
     return () => clearTimeout(handle);
-  }, [supabase, userId, term, selectedCourses, instructorLocks, selectionsLoaded]);
+  }, [supabase, userId, term, selectedCourses, instructorLocks, sectionLocks, selectionsLoaded]);
 
   // Hard free days (multi-select)
   const [hardFreeDays, setHardFreeDays] = useState<string[]>([]);
@@ -461,11 +473,11 @@ export default function Home() {
     };
 
     try {
-      const data = await optimizeRanked(term, selectedCourses, prefs, 6, instructorLocks);
+      const data = await optimizeRanked(term, selectedCourses, prefs, 6, instructorLocks, sectionLocks);
 
       // Must return before setResult: no ok:false response carries a `results`
       // key, and the results renderer calls result.results.map() unguarded.
-      // Not every ok:false carries blocked_by_instructor_lock - "course codes
+      // Not every ok:false carries blocked_by_lock - "course codes
       // not found" does not - so key off ok alone.
       if (data?.ok === false) {
         setError(data.error ?? "Could not build a timetable for this request.");
@@ -610,6 +622,8 @@ export default function Home() {
             setSelected={handleSetSelectedCourses}
             locks={instructorLocks}
             setLocks={setInstructorLocks}
+            sectionLocks={sectionLocks}
+            setSectionLocks={setSectionLocks}
           />
           <div style={{ marginTop: 8, fontSize: 14 }}>
             <b>Selected:</b> {selectedCourses.join(", ")}

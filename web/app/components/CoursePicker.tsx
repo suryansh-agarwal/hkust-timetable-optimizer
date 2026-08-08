@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
-import { loadCourseIndex, searchCourseIndex, getIndexCacheStatus, getCourseFromIndex, CourseIndexEntry } from "@/lib/api";
+import { useEffect, useRef, useState, useMemo, type ReactNode } from "react";
+import { loadCourseIndex, searchCourseIndex, getIndexCacheStatus, getCourseFromIndex, fetchCourseSections, CourseIndexEntry } from "@/lib/api";
+import type { CourseSections, SectionLock } from "@/lib/api";
+import { optionsFor, reconcilePins, matchingAppliesTo } from "@/lib/sectionOptions";
 
 function IndexStatusBadge({ loading, error, ready, count }: Readonly<{ loading: boolean; error: string; ready: boolean; count: number }>) {
   if (loading) {
@@ -16,14 +18,26 @@ function IndexStatusBadge({ loading, error, ready, count }: Readonly<{ loading: 
   return <span style={{ fontSize: 12, color: "var(--text-muted)" }}>Index not loaded</span>;
 }
 
+function samePins(a: SectionLock, b: SectionLock) {
+  return a.lecture === b.lecture && a.tutorial === b.tutorial && a.lab === b.lab;
+}
+
+function summarise(s: { meetings: { day: string; start: string; end: string }[] }) {
+  if (s.meetings.length === 0) return "no meetings";
+  const days = s.meetings.map((m) => m.day).join("/");
+  return `${days} ${s.meetings[0].start}`;
+}
+
 export function CoursePicker(props: Readonly<{
   term: string;
   selected: string[];
   setSelected: (codes: string[]) => void;
   locks: Record<string, string>;
   setLocks: (locks: Record<string, string>) => void;
+  sectionLocks: Record<string, SectionLock>;
+  setSectionLocks: (locks: Record<string, SectionLock>) => void;
 }>) {
-  const { term, selected, setSelected, locks, setLocks } = props;
+  const { term, selected, setSelected, locks, setLocks, sectionLocks, setSectionLocks } = props;
 
   const [q, setQ] = useState("");
   const [indexStatus, setIndexStatus] = useState<{ loaded: boolean; count: number; error: string }>({
@@ -50,6 +64,28 @@ export function CoursePicker(props: Readonly<{
       delete next[courseCode];
     }
     setLocks(next);
+  }
+
+  function setPin(courseCode: string, kind: "lecture" | "tutorial" | "lab", value: string) {
+    const current = sectionLocks[courseCode] ?? {};
+    const updated: SectionLock = { ...current };
+    if (value) {
+      updated[kind] = value;
+    } else {
+      delete updated[kind];
+    }
+    // Changing or clearing the lecture re-narrows the other components, so any
+    // tutorial/lab pin derived from the old lecture is stale - including one
+    // narrowing auto-selected, which the student never chose and would
+    // otherwise keep being sent to the optimiser. Drop them and let
+    // reconcilePins re-derive from the new lecture.
+    // `?? ""` so selecting a professor on a course with no lecture pin is not
+    // read as a lecture change and does not wipe a tutorial the student chose.
+    if (kind === "lecture" && (current.lecture ?? "") !== value) {
+      delete updated.tutorial;
+      delete updated.lab;
+    }
+    setSectionLocks({ ...sectionLocks, [courseCode]: updated });
   }
 
   // Load index when term changes
@@ -85,6 +121,88 @@ export function CoursePicker(props: Readonly<{
       cancelled = true;
     };
   }, [term]);
+
+  // Keyed by `${term}:${code}`, matching api.ts's own cache key, so a course
+  // code shared between terms can never be read as already-fetched or
+  // reconciled against the wrong term's sections.
+  const [sectionData, setSectionData] = useState<Record<string, CourseSections>>({});
+  const [sectionFailed, setSectionFailed] = useState<Record<string, boolean>>({});
+  // Tracks which `${term}:${code}` keys have an in-flight or completed
+  // request, independent of React state, so the fetch effect below never
+  // issues a second request for a key it has already started.
+  const requested = useRef<Set<string>>(new Set());
+
+  // Section data is per course and fetched on demand, so a student who picks
+  // five courses pays for five small requests rather than a doubled index.
+  // Depends on [term, selected] only - not on sectionData - because a
+  // per-course write inside the loop below would otherwise change
+  // `sectionData` mid-flight and re-trigger this same effect with a new
+  // "missing" list while the previous run is still awaiting its next fetch.
+  useEffect(() => {
+    let cancelled = false;
+    const missing = selected.filter((code) => !requested.current.has(`${term}:${code}`));
+    if (missing.length === 0) return;
+
+    (async () => {
+      for (const code of missing) {
+        const key = `${term}:${code}`;
+        requested.current.add(key);
+        try {
+          const data = await fetchCourseSections(term, code);
+          // Stored regardless of cancellation. The write is keyed by term and
+          // course and is idempotent, so a late arrival is a harmless cache
+          // fill, never a wrong render. Discarding it instead would strand the
+          // course with no pending fetch and nothing scheduled to retry it.
+          setSectionData((prev) => ({ ...prev, [key]: data }));
+          setSectionFailed((prev) => {
+            if (!prev[key]) return prev;
+            const next = { ...prev };
+            delete next[key];
+            return next;
+          });
+        } catch {
+          // Un-mark so a later run can retry, and record the failure so the
+          // course falls back to the professor-only control instead of
+          // sitting on "Loading sections...".
+          requested.current.delete(key);
+          setSectionFailed((prev) => ({ ...prev, [key]: true }));
+        }
+        // Only after handling this course: a superseded list should not keep
+        // issuing requests for courses the student may no longer be looking at.
+        if (cancelled) return;
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [term, selected]);
+
+  // reconcilePins is idempotent, so this settles in one pass: it only writes
+  // when a pin was dropped or auto-filled.
+  useEffect(() => {
+    let changed = false;
+    const next: Record<string, SectionLock> = {};
+
+    for (const code of selected) {
+      const data = sectionData[`${term}:${code}`];
+      const current = sectionLocks[code] ?? {};
+      if (!data) {
+        if (Object.keys(current).length > 0) next[code] = current;
+        continue;
+      }
+      const reconciled = reconcilePins(data, current);
+      if (Object.keys(reconciled).length > 0) next[code] = reconciled;
+      // Field-by-field, not JSON.stringify: pins loaded from Postgres can
+      // arrive with their keys in any order, and a string comparison would
+      // see that as a change on every render.
+      if (!samePins(reconciled, current)) changed = true;
+    }
+
+    if (changed || Object.keys(next).length !== Object.keys(sectionLocks).length) {
+      setSectionLocks(next);
+    }
+  }, [term, selected, sectionData, sectionLocks, setSectionLocks]);
 
   // A persisted lock outlives the index it came from. If a rebuilt index
   // leaves the course with one instructor the select renders disabled, and
@@ -191,27 +309,122 @@ export function CoursePicker(props: Readonly<{
                   </button>
                 </div>
 
-                {instructors.length > 0 && (
-                  <select
-                    value={locks[code] ?? ""}
-                    disabled={onlyOne}
-                    onChange={(e) => setLock(code, e.target.value)}
-                    aria-label={`Professor for ${code}`}
-                    title={onlyOne ? "Only one instructor teaches this course" : "Only use sections taught by this professor"}
-                    style={{ padding: 4, fontSize: 12, borderRadius: 6, maxWidth: 220 }}
-                  >
-                    {onlyOne ? (
-                      <option value="">{instructors[0]}</option>
-                    ) : (
-                      <>
-                        <option value="">Any professor</option>
-                        {instructors.map((name) => (
-                          <option key={name} value={name}>{name}</option>
-                        ))}
-                      </>
-                    )}
-                  </select>
-                )}
+                {(() => {
+                  const sectionKey = `${term}:${code}`;
+                  const data = sectionData[sectionKey];
+                  const pins = sectionLocks[code] ?? {};
+                  if (!data) {
+                    if (sectionFailed[sectionKey]) {
+                      // Section fetch failed permanently: fall back to the
+                      // professor-only control that shipped in 6bf408d,
+                      // rather than let instructor locking silently
+                      // disappear because of an unrelated fetch failure.
+                      return instructors.length > 0 ? (
+                        <select
+                          value={locks[code] ?? ""}
+                          disabled={onlyOne}
+                          onChange={(e) => setLock(code, e.target.value)}
+                          aria-label={`Professor for ${code}`}
+                          title={onlyOne ? "Only one instructor teaches this course" : "Only use sections taught by this professor"}
+                          style={{ padding: 4, fontSize: 12, borderRadius: 6, maxWidth: 220 }}
+                        >
+                          {onlyOne ? (
+                            <option value="">{instructors[0]}</option>
+                          ) : (
+                            <>
+                              <option value="">Any professor</option>
+                              {instructors.map((name) => (
+                                <option key={name} value={name}>{name}</option>
+                              ))}
+                            </>
+                          )}
+                        </select>
+                      ) : null;
+                    }
+                    return instructors.length > 0 ? (
+                      <div style={{ fontSize: 11, color: "var(--text-faint)" }}>Loading sections…</div>
+                    ) : null;
+                  }
+
+                  const lectures = optionsFor(data, "LEC");
+                  const rows: ReactNode[] = [];
+
+                  if (lectures.length > 0 || instructors.length > 1) {
+                    rows.push(
+                      <label key="lec" style={{ display: "flex", flexDirection: "column", gap: 2, fontSize: 11, color: "var(--text-muted)" }}>
+                        Lecture
+                        <select
+                          value={pins.lecture ?? (locks[code] ? `prof:${locks[code]}` : "")}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            if (v.startsWith("prof:")) {
+                              setLock(code, v.slice(5));
+                              setPin(code, "lecture", "");
+                            } else {
+                              setLock(code, "");
+                              setPin(code, "lecture", v);
+                            }
+                          }}
+                          style={{ padding: 4, fontSize: 12, borderRadius: 6, maxWidth: 240 }}
+                        >
+                          <option value="">Any</option>
+                          {/* Same threshold the prune effect above applies. A
+                              course with one instructor has nothing to choose,
+                              and offering the name anyway made the control
+                              snap back to "Any" the moment it was picked. */}
+                          {instructors.length > 1 && (
+                            <optgroup label="Professor">
+                              {instructors.map((n) => (
+                                <option key={n} value={`prof:${n}`}>{n}</option>
+                              ))}
+                            </optgroup>
+                          )}
+                          {lectures.length > 0 && (
+                            <optgroup label="Lecture">
+                              {lectures.map((s) => (
+                                <option key={s.section} value={s.section}>
+                                  {s.section} · {summarise(s)}
+                                </option>
+                              ))}
+                            </optgroup>
+                          )}
+                        </select>
+                      </label>
+                    );
+                  }
+
+                  // A lecture-less course schedules exactly one of its sections,
+                  // so the backend rejects any pin on it rather than silently
+                  // dropping one. Do not offer a control the request cannot
+                  // honour; the Lecture/professor row above still renders.
+                  for (const kind of lectures.length > 0 ? (["TUT", "LAB"] as const) : []) {
+                    const key = kind === "TUT" ? "tutorial" : "lab";
+                    const options = optionsFor(data, kind, pins.lecture);
+                    if (options.length === 0) continue;
+                    const auto = matchingAppliesTo(data, kind) && !!pins.lecture && options.length === 1;
+                    rows.push(
+                      <label key={kind} style={{ display: "flex", flexDirection: "column", gap: 2, fontSize: 11, color: "var(--text-muted)" }}>
+                        {kind === "TUT" ? "Tutorial" : "Lab"}
+                        <select
+                          value={pins[key] ?? ""}
+                          disabled={auto}
+                          onChange={(e) => setPin(code, key, e.target.value)}
+                          title={auto ? "Determined by the lecture you picked" : undefined}
+                          style={{ padding: 4, fontSize: 12, borderRadius: 6, maxWidth: 240 }}
+                        >
+                          {!auto && <option value="">Any</option>}
+                          {options.map((s) => (
+                            <option key={s.section} value={s.section}>
+                              {s.section} · {summarise(s)}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    );
+                  }
+
+                  return <>{rows}</>;
+                })()}
               </div>
             );
           })}

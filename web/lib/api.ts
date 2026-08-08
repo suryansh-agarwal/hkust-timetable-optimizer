@@ -135,6 +135,53 @@ export function getCourseFromIndex(
 }
 
 // ============================================================
+// Per-course section data (for the section picker)
+// ============================================================
+
+export type CourseSection = {
+  section: string;
+  type: "LEC" | "TUT" | "LAB" | "OTH";
+  // Matching group, computed server-side. Compare as an opaque value; never
+  // re-derive it here, or it will drift from the optimiser's rule.
+  group: string | null;
+  instructor: string | null;
+  meetings: { day: string; start: string; end: string }[];
+};
+
+export type CourseSections = {
+  course_code: string;
+  matching_required: boolean;
+  matching_type: "lab" | "tutorial" | "both" | null;
+  sections: CourseSection[];
+};
+
+export type SectionLock = { lecture?: string; tutorial?: string; lab?: string };
+
+const sectionsCache: Map<string, CourseSections> = new Map();
+
+/**
+ * Sections for one course. Cached per term+course for the session; section
+ * times change rarely enough within a sitting, and this keeps the picker
+ * from refetching every time a dropdown opens.
+ */
+export async function fetchCourseSections(
+  term: string,
+  courseCode: string
+): Promise<CourseSections> {
+  const key = `${term}:${courseCode}`;
+  const cached = sectionsCache.get(key);
+  if (cached) return cached;
+
+  const url = `${API_BASE}/course/sections?term=${encodeURIComponent(term)}&course_code=${encodeURIComponent(courseCode)}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`fetchCourseSections failed: ${res.status}`);
+
+  const data: CourseSections = await res.json();
+  sectionsCache.set(key, data);
+  return data;
+}
+
+// ============================================================
 // Preferences Type
 // ============================================================
 
@@ -176,7 +223,8 @@ export async function optimizeRanked(
   course_codes: string[],
   prefs: Prefs,
   max_solutions = 5,
-  instructor_locks: Record<string, string> = {}
+  instructor_locks: Record<string, string> = {},
+  section_locks: Record<string, SectionLock> = {}
 ) {
   const res = await fetch(`${API_BASE}/optimize/ranked`, {
     method: "POST",
@@ -188,6 +236,7 @@ export async function optimizeRanked(
       search_limit: 2000,
       prefs,
       instructor_locks,
+      section_locks,
     }),
   });
   if (!res.ok) {

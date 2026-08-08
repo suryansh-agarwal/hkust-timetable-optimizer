@@ -18,6 +18,8 @@ from pydantic import BaseModel, Field
 from fastapi import Body
 
 from bundles import build_bundles, MatchingConstraint
+from instructor_filter import normalise
+from section_lock import has_pin
 from optimizer_bundles import BundleChoice, find_bundle_schedules, schedule_to_json as schedule_to_json_bundles
 
 from typing import Any, Optional, Dict, List, Literal
@@ -34,7 +36,7 @@ from wcq_subjects import list_subjects
 from catalog_state import load_state
 
 from mini_catalog import load_mini_catalog, normalize_code
-from section_utils import section_type
+from section_utils import section_type, group_key
 
 app = FastAPI()
 
@@ -182,6 +184,9 @@ class OptimizeRankedRequest(BaseModel):
     use_cache: bool = True
     # Course code -> professor. Absent key means the course is unconstrained.
     instructor_locks: Dict[str, str] = Field(default_factory=dict)
+    # Course code -> {"lecture": "L1", "tutorial": "T1B", "lab": "LA2"}.
+    # Every inner key is optional; an absent one leaves that component free.
+    section_locks: Dict[str, Dict[str, str]] = Field(default_factory=dict)
     prefs: Preferences = Preferences()
 
 @app.get("/")
@@ -192,6 +197,21 @@ def root():
 @app.get("/wcq/subjects")
 def wcq_subjects(term: str = Query(...)):
     return {"term": term, "subjects": list_subjects(term)}
+
+def _describe_lock(instructor_lock: Optional[str], section_lock: Optional[Dict[str, str]]) -> str:
+    """Human-readable summary of why a course was blocked, naming the pins."""
+    parts = []
+    # normalise, not truthiness: instructor_filter owns "is this lock real?",
+    # and a whitespace-only value that no longer filters anything must not be
+    # printed back as "professor    ".
+    if normalise(instructor_lock):
+        parts.append(f"professor {instructor_lock}")
+    for key, label in (("lecture", "lecture"), ("tutorial", "tutorial"), ("lab", "lab")):
+        value = (section_lock or {}).get(key)
+        if value:
+            parts.append(f"{label} {value}")
+    return " and ".join(parts) if parts else "the selected constraints"
+
 
 @app.post("/optimize/ranked")
 def optimize_ranked(req: OptimizeRankedRequest):
@@ -231,22 +251,26 @@ def optimize_ranked(req: OptimizeRankedRequest):
             used_matching_rules,
         )
         lock = req.instructor_locks.get(cc)
-        bundles = build_bundles(course, constraint, instructor_lock=lock)
-        if not bundles and lock:
+        pins = req.section_locks.get(cc)
+        bundles = build_bundles(course, constraint, instructor_lock=lock, section_lock=pins)
+        # Same definition of "a lock is set" that build_bundles applies, so a
+        # whitespace-only lock cannot be blamed for a block it did not cause.
+        if not bundles and (normalise(lock) or has_pin(pins)):
             blocked_by_lock.append(cc)
         choices.append(BundleChoice(course_code=cc, bundles=[b.parts for b in bundles]))
 
     # Distinct from a generic no-solution: the fix is to drop the lock, not the
-    # course, so say which lock and which course.
+    # course, so say which constraint and which course.
     if blocked_by_lock:
         details = ", ".join(
-            f"{cc} has no sections taught by {req.instructor_locks[cc]}"
+            f"{cc} has no sections matching "
+            f"{_describe_lock(req.instructor_locks.get(cc), req.section_locks.get(cc))}"
             for cc in blocked_by_lock
         )
         return {
             "ok": False,
             "error": f"No schedule is possible: {details}.",
-            "blocked_by_instructor_lock": blocked_by_lock,
+            "blocked_by_lock": blocked_by_lock,
             "subjects_fetched": subjects_fetched,
             "cache_misses": cache_misses,
         }
@@ -416,6 +440,53 @@ def optimize_bundles(req: OptimizeBasicRequest):
     }
     
     return result
+
+
+@app.get("/course/sections")
+def course_sections(term: str = Query(...), course_code: str = Query(...)):
+    """
+    Sections for one course, for the section picker.
+
+    `type` and `group` are computed here rather than in the browser: the
+    matching rules depend on them, and a second implementation of section
+    numbering on the client would eventually disagree with this one.
+    """
+    # normalize_code, not a second hand-rolled strip/upper: it also collapses
+    # internal whitespace, so "COMP  2011" resolves here exactly as it does in
+    # the mini-catalog lookup below instead of 404ing.
+    normalized = normalize_code(course_code)
+    course_map, subjects_fetched, cache_misses = _load_courses_with_cache(
+        term, [normalized], refresh=False, use_cache=True
+    )
+    course = course_map.get(normalized)
+    if not course:
+        raise HTTPException(status_code=404, detail=f"Course not found: {course_code}")
+
+    try:
+        mini_catalog = load_mini_catalog(term)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    entry = mini_catalog.get(normalized) or {}
+
+    return {
+        "course_code": course.course_code,
+        "matching_required": bool(entry.get("matching_required", False)),
+        "matching_type": entry.get("matching_type"),
+        "sections": [
+            {
+                "section": s.section,
+                "type": section_type(s.section),
+                "group": group_key(s.section),
+                "instructor": s.instructor,
+                "meetings": [
+                    {"day": m.day, "start": m.start, "end": m.end} for m in s.meetings
+                ],
+            }
+            for s in course.sections
+        ],
+        "_meta": {"subjects_fetched": subjects_fetched, "cache_misses": cache_misses},
+    }
 
 
 @app.get("/health")

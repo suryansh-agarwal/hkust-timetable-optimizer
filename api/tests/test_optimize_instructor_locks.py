@@ -52,6 +52,6 @@ def test_lock_restricts_results_to_that_professor(client):
 def test_unsatisfiable_lock_reports_the_course_and_professor(client):
     data = post(client, instructor_locks={"COMP 2011": "NOBODY, Real"})
     assert data["ok"] is False
-    assert data["blocked_by_instructor_lock"] == ["COMP 2011"]
+    assert data["blocked_by_lock"] == ["COMP 2011"]
     assert "COMP 2011" in data["error"]
     assert "NOBODY, Real" in data["error"]

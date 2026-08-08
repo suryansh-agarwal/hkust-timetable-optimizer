@@ -1,11 +1,11 @@
 from __future__ import annotations
 from dataclasses import dataclass
-import re
 from typing import List, Dict, Any, Optional
 
 from models import Course, Section
-from section_utils import section_type
+from section_utils import section_type, group_key
 from instructor_filter import lock_is_satisfiable, section_allows, normalise
+from section_lock import section_allows_pin, has_pin
 
 
 @dataclass
@@ -21,16 +21,11 @@ class MatchingConstraint:
     matching_type: Optional[str] = None  # "lab" | "tutorial" | "both" | None
 
 
-def section_num(code: str) -> str | None:
-    """Extract the first numeric group from a section code (e.g., L1 -> '1', T1A -> '1')."""
-    m = re.search(r"(\d+)", code)
-    return m.group(1) if m else None
-
-
 def build_bundles(
     course: Course,
     constraint: Optional[MatchingConstraint] = None,
     instructor_lock: Optional[str] = None,
+    section_lock: Optional[Dict[str, Any]] = None,
 ) -> List[Bundle]:
     """
     Build all valid bundles for a course.
@@ -60,7 +55,12 @@ def build_bundles(
     had_tut = any(section_type(s.section) == "TUT" for s in course.sections)
     had_lab = any(section_type(s.section) == "LAB" for s in course.sections)
 
-    sections = [s for s in course.sections if section_allows(s.instructor, instructor_lock)]
+    sections = [
+        s
+        for s in course.sections
+        if section_allows(s.instructor, instructor_lock)
+        and section_allows_pin(s.section, section_lock)
+    ]
 
     lecs, tuts, labs, oth = [], [], [], []
     for s in sections:
@@ -86,6 +86,15 @@ def build_bundles(
     if not lecs and not tuts and not labs:
         return [Bundle(course.course_code, [s]) for s in sections]
 
+    # A lecture-less course emits one standalone bundle per section and the
+    # optimiser then picks exactly one of them, so a pin cannot survive: the
+    # student would get a single unpinned tutorial or lab and no sign that the
+    # pin was dropped. The emptied-bucket guard above cannot see this, because
+    # the pinned section is still present - it is simply not required. Pinning
+    # is unsupported here, so say so by blocking the course instead.
+    if not lecs and has_pin(section_lock):
+        return []
+
     # If lecs are missing but there are tuts/labs, treat all as standalone (rare)
     if not lecs:
         return [Bundle(course.course_code, [s]) for s in sections]
@@ -102,13 +111,13 @@ def build_bundles(
     bundles: List[Bundle] = []
 
     for lec in lecs:
-        lec_num = section_num(lec.section)
+        lec_num = group_key(lec.section)
 
         if strict_matching:
             # Strict matching: filter by numeric part when required
             if need_tut:
                 if match_tutorial and lec_num:
-                    candidate_tuts = [t for t in tuts if section_num(t.section) == lec_num]
+                    candidate_tuts = [t for t in tuts if group_key(t.section) == lec_num]
                 else:
                     candidate_tuts = tuts
             else:
@@ -117,7 +126,7 @@ def build_bundles(
             for tut in candidate_tuts:
                 if need_lab:
                     if match_lab and lec_num:
-                        candidate_labs = [l for l in labs if section_num(l.section) == lec_num]
+                        candidate_labs = [l for l in labs if group_key(l.section) == lec_num]
                     else:
                         candidate_labs = labs
                 else:
@@ -150,7 +159,7 @@ def build_bundles(
     # lock, a broken numeric pairing means the course is unschedulable with
     # that professor, not that we should fabricate a bundle missing a
     # required tutorial/lab.
-    if not bundles and strict_matching and not normalise(instructor_lock):
+    if not bundles and strict_matching and not normalise(instructor_lock) and not has_pin(section_lock):
         # Fallback: create what we can (this means the WCQ data is inconsistent)
         for lec in lecs:
             bundles.append(Bundle(course.course_code, [lec]))
