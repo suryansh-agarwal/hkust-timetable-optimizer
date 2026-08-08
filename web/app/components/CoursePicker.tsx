@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { loadCourseIndex, searchCourseIndex, getIndexCacheStatus, CourseIndexEntry } from "@/lib/api";
+import { loadCourseIndex, searchCourseIndex, getIndexCacheStatus, getCourseFromIndex, CourseIndexEntry } from "@/lib/api";
 
 function IndexStatusBadge({ loading, error, ready, count }: Readonly<{ loading: boolean; error: string; ready: boolean; count: number }>) {
   if (loading) {
@@ -20,8 +20,10 @@ export function CoursePicker(props: Readonly<{
   term: string;
   selected: string[];
   setSelected: (codes: string[]) => void;
+  locks: Record<string, string>;
+  setLocks: (locks: Record<string, string>) => void;
 }>) {
-  const { term, selected, setSelected } = props;
+  const { term, selected, setSelected, locks, setLocks } = props;
 
   const [q, setQ] = useState("");
   const [indexStatus, setIndexStatus] = useState<{ loaded: boolean; count: number; error: string }>({
@@ -38,6 +40,16 @@ export function CoursePicker(props: Readonly<{
 
   function remove(courseCode: string) {
     setSelected(selected.filter((x) => x !== courseCode));
+  }
+
+  function setLock(courseCode: string, instructor: string) {
+    const next = { ...locks };
+    if (instructor) {
+      next[courseCode] = instructor;
+    } else {
+      delete next[courseCode];
+    }
+    setLocks(next);
   }
 
   // Load index when term changes
@@ -109,44 +121,72 @@ export function CoursePicker(props: Readonly<{
         </div>
       )}
 
-      {/* selected chips */}
+      {/* selected courses, each with an optional professor lock */}
       <div style={{ marginTop: 12 }}>
         <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Selected</div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
           {selected.length === 0 && <div style={{ color: "var(--text-faint)" }}>No courses selected.</div>}
-          {selected.map((code) => (
-            <div
-              key={code}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 8,
-                border: "1px solid var(--border-subtle)",
-                borderRadius: 999,
-                padding: "6px 10px",
-                background: "var(--surface-2)",
-                fontSize: 13,
-                fontWeight: 600,
-              }}
-            >
-              {code}
-              <button
-                onClick={() => remove(code)}
+          {selected.map((code) => {
+            const instructors = getCourseFromIndex(term, code)?.instructors ?? [];
+            const onlyOne = instructors.length === 1;
+            return (
+              <div
+                key={code}
                 style={{
-                  border: "none",
-                  background: "transparent",
-                  cursor: "pointer",
-                  fontSize: 16,
-                  lineHeight: "16px",
-                  color: "var(--text-muted)",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 6,
+                  border: "1px solid var(--border-subtle)",
+                  borderRadius: 10,
+                  padding: "8px 10px",
+                  background: "var(--surface-2)",
+                  fontSize: 13,
+                  minWidth: 200,
                 }}
-                aria-label={`Remove ${code}`}
-                title="Remove"
               >
-                ×
-              </button>
-            </div>
-          ))}
+                <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "space-between" }}>
+                  <span style={{ fontWeight: 600 }}>{code}</span>
+                  <button
+                    onClick={() => remove(code)}
+                    style={{
+                      border: "none",
+                      background: "transparent",
+                      cursor: "pointer",
+                      fontSize: 16,
+                      lineHeight: "16px",
+                      color: "var(--text-muted)",
+                    }}
+                    aria-label={`Remove ${code}`}
+                    title="Remove"
+                  >
+                    ×
+                  </button>
+                </div>
+
+                {instructors.length > 0 && (
+                  <select
+                    value={locks[code] ?? ""}
+                    disabled={onlyOne}
+                    onChange={(e) => setLock(code, e.target.value)}
+                    aria-label={`Professor for ${code}`}
+                    title={onlyOne ? "Only one instructor teaches this course" : "Only use sections taught by this professor"}
+                    style={{ padding: 4, fontSize: 12, borderRadius: 6, maxWidth: 220 }}
+                  >
+                    {onlyOne ? (
+                      <option value="">{instructors[0]}</option>
+                    ) : (
+                      <>
+                        <option value="">Any professor</option>
+                        {instructors.map((name) => (
+                          <option key={name} value={name}>{name}</option>
+                        ))}
+                      </>
+                    )}
+                  </select>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 
