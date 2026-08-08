@@ -1,10 +1,9 @@
 from __future__ import annotations
 from dataclasses import dataclass
-import re
 from typing import List, Dict, Any, Optional
 
 from models import Course, Section
-from section_utils import section_type
+from section_utils import section_type, group_key
 from instructor_filter import lock_is_satisfiable, section_allows, normalise
 from section_lock import section_allows_pin, has_pin
 
@@ -20,12 +19,6 @@ class MatchingConstraint:
     """Matching constraint for a course."""
     matching_required: bool = False
     matching_type: Optional[str] = None  # "lab" | "tutorial" | "both" | None
-
-
-def section_num(code: str) -> str | None:
-    """Extract the first numeric group from a section code (e.g., L1 -> '1', T1A -> '1')."""
-    m = re.search(r"(\d+)", code)
-    return m.group(1) if m else None
 
 
 def build_bundles(
@@ -109,13 +102,13 @@ def build_bundles(
     bundles: List[Bundle] = []
 
     for lec in lecs:
-        lec_num = section_num(lec.section)
+        lec_num = group_key(lec.section)
 
         if strict_matching:
             # Strict matching: filter by numeric part when required
             if need_tut:
                 if match_tutorial and lec_num:
-                    candidate_tuts = [t for t in tuts if section_num(t.section) == lec_num]
+                    candidate_tuts = [t for t in tuts if group_key(t.section) == lec_num]
                 else:
                     candidate_tuts = tuts
             else:
@@ -124,7 +117,7 @@ def build_bundles(
             for tut in candidate_tuts:
                 if need_lab:
                     if match_lab and lec_num:
-                        candidate_labs = [l for l in labs if section_num(l.section) == lec_num]
+                        candidate_labs = [l for l in labs if group_key(l.section) == lec_num]
                     else:
                         candidate_labs = labs
                 else:
