@@ -5,6 +5,7 @@ from typing import List, Dict, Any, Optional
 
 from models import Course, Section
 from section_utils import section_type
+from instructor_filter import lock_is_satisfiable, section_allows
 
 
 @dataclass
@@ -27,8 +28,9 @@ def section_num(code: str) -> str | None:
 
 
 def build_bundles(
-    course: Course, 
-    constraint: Optional[MatchingConstraint] = None
+    course: Course,
+    constraint: Optional[MatchingConstraint] = None,
+    instructor_lock: Optional[str] = None,
 ) -> List[Bundle]:
     """
     Build all valid bundles for a course.
@@ -41,8 +43,17 @@ def build_bundles(
     If no constraint or matching_required is False:
     - Allow full cartesian pairing across lectures/labs/tutorials
     """
+    # A lock must be satisfied by a section that actually names the professor.
+    # section_allows lets TBA sections through, so without this check a course
+    # whose lectures were all filtered out could still produce lab-only
+    # bundles via the "no lectures" early return below.
+    if not lock_is_satisfiable((s.instructor for s in course.sections), instructor_lock):
+        return []
+
+    sections = [s for s in course.sections if section_allows(s.instructor, instructor_lock)]
+
     lecs, tuts, labs, oth = [], [], [], []
-    for s in course.sections:
+    for s in sections:
         t = section_type(s.section)
         if t == "LEC":
             lecs.append(s)
@@ -55,11 +66,11 @@ def build_bundles(
 
     # If no recognized types, treat each section as a standalone bundle
     if not lecs and not tuts and not labs:
-        return [Bundle(course.course_code, [s]) for s in course.sections]
+        return [Bundle(course.course_code, [s]) for s in sections]
 
     # If lecs are missing but there are tuts/labs, treat all as standalone (rare)
     if not lecs:
-        return [Bundle(course.course_code, [s]) for s in course.sections]
+        return [Bundle(course.course_code, [s]) for s in sections]
 
     # Determine required components
     need_tut = len(tuts) > 0
