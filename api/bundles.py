@@ -50,6 +50,16 @@ def build_bundles(
     if not lock_is_satisfiable((s.instructor for s in course.sections), instructor_lock):
         return []
 
+    # Which components a course HAS is a property of the course, not of the
+    # lock, so read it from the unfiltered sections. Tutorials and labs are
+    # often run by TAs under their own names; deciding "is a tutorial
+    # required?" from the post-filter buckets lets a lock empty the bucket and
+    # be read as "no tutorial required", producing a timetable that silently
+    # omits a required class.
+    had_lec = any(section_type(s.section) == "LEC" for s in course.sections)
+    had_tut = any(section_type(s.section) == "TUT" for s in course.sections)
+    had_lab = any(section_type(s.section) == "LAB" for s in course.sections)
+
     sections = [s for s in course.sections if section_allows(s.instructor, instructor_lock)]
 
     lecs, tuts, labs, oth = [], [], [], []
@@ -63,6 +73,14 @@ def build_bundles(
             labs.append(s)
         else:
             oth.append(s)
+
+    # A component that existed before the lock and is empty after it makes the
+    # course unschedulable under that lock. Returning [] surfaces it as a
+    # blocked lock; falling through would either drop the component or, when
+    # the lectures are what went missing, emit lecture-less bundles via the
+    # "no lectures" early return below. Without a lock these are all no-ops.
+    if (had_lec and not lecs) or (had_tut and not tuts) or (had_lab and not labs):
+        return []
 
     # If no recognized types, treat each section as a standalone bundle
     if not lecs and not tuts and not labs:

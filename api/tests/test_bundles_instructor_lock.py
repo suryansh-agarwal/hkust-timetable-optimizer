@@ -62,6 +62,66 @@ def test_lock_naming_nobody_yields_no_bundles():
     assert build_bundles(course, MatchingConstraint(), instructor_lock="NOBODY, Real") == []
 
 
+def test_lock_that_empties_the_tutorial_bucket_yields_no_bundles():
+    # Tutorials are commonly run by TAs under their own names, so a lock on a
+    # lecturer can empty the tutorial bucket. Deciding "is a tutorial
+    # required?" from the filtered sections would read that as "no tutorial",
+    # and hand back [[L1]] - a timetable missing a required class.
+    course = make_course([
+        ("L1", "KELLER, Wolfgang"),
+        ("L2", "LI, Xuan"),
+        ("T1", "CHAN, TA"),
+        ("T2", "CHAN, TA"),
+    ])
+    assert build_bundles(course, MatchingConstraint(), instructor_lock="KELLER, Wolfgang") == []
+
+
+def test_lock_that_empties_the_lab_bucket_yields_no_bundles():
+    course = make_course([
+        ("L1", "KELLER, Wolfgang"),
+        ("L2", "LI, Xuan"),
+        ("LA1", "CHAN, TA"),
+        ("LA2", "CHAN, TA"),
+    ])
+    assert build_bundles(course, MatchingConstraint(), instructor_lock="KELLER, Wolfgang") == []
+
+
+def test_lock_named_only_on_a_tutorial_yields_no_lectureless_bundles():
+    # lock_is_satisfiable passes (a tutorial names the professor), every
+    # lecture is filtered out, and the "no lectures" early return would emit
+    # standalone tutorial bundles with no lecture at all.
+    course = make_course([
+        ("L1", "CHAN, Cecia Ki"),
+        ("T1", "LI, Xin"),
+        ("T2", "TBA"),
+    ])
+    assert build_bundles(course, MatchingConstraint(), instructor_lock="LI, Xin") == []
+
+
+def test_course_without_tutorials_is_unaffected_by_the_component_guard():
+    # No false positives: an absent component was never required.
+    course = make_course([
+        ("L1", "KELLER, Wolfgang"),
+        ("L2", "LI, Xuan"),
+        ("LA1", "TBA"),
+    ])
+    bundles = build_bundles(course, MatchingConstraint(), instructor_lock="KELLER, Wolfgang")
+    assert sections_in(bundles) == {"L1", "LA1"}
+
+
+def test_whitespace_only_lock_behaves_as_no_lock():
+    course = make_course([
+        ("L1", "LI, Xin"),
+        ("L2", "CHAN, Cecia Ki"),
+        ("LA1", "TBA"),
+    ])
+    assert sections_in(build_bundles(course, MatchingConstraint(), instructor_lock="   ")) == {
+        "L1",
+        "L2",
+        "LA1",
+    }
+
+
 def test_lock_matching_only_tba_sections_yields_no_bundles():
     # Guards the "no lectures left" early return: TBA labs alone must not
     # become a valid schedule for the course.

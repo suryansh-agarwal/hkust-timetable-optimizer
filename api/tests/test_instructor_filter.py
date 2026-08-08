@@ -40,6 +40,28 @@ def test_different_professor_is_rejected():
     assert section_allows("CHAN, Cecia Ki", "LI, Xin") is False
 
 
+def test_name_prefix_of_a_longer_name_is_rejected():
+    # Both people are in the live 2610 catalogue. Bare substring matching would
+    # let a lock on the shorter name admit the longer one's sections.
+    assert section_allows("LU, Yanglong", "LU, Yang") is False
+    assert section_allows("LU, Yang", "LU, Yang") is True
+    assert lock_is_satisfiable(["LU, Yanglong"], "LU, Yang") is False
+
+
+def test_boundary_rule_still_matches_joined_co_instructor_cells():
+    cell = "KU, Yin Bon LEUNG, Shing Yu"
+    assert section_allows(cell, "KU, Yin Bon") is True
+    assert section_allows(cell, "LEUNG, Shing Yu") is True
+    assert lock_is_satisfiable([cell], "KU, Yin Bon") is True
+
+
+def test_whitespace_only_lock_is_treated_as_no_lock():
+    # " " is truthy but normalises to "", which is a substring of everything.
+    assert section_allows("CHAN, Cecia Ki", "   ") is True
+    assert section_allows("TBA", " ") is True
+    assert lock_is_satisfiable(["TBA"], "   ") is True
+
+
 def test_absent_lock_allows_every_section():
     assert section_allows("CHAN, Cecia Ki", None) is True
     assert section_allows("CHAN, Cecia Ki", "") is True

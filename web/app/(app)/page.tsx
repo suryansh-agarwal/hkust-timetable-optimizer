@@ -463,10 +463,12 @@ export default function Home() {
     try {
       const data = await optimizeRanked(term, selectedCourses, prefs, 6, instructorLocks);
 
-      // Must return before setResult: the blocked response has no `results`
+      // Must return before setResult: no ok:false response carries a `results`
       // key, and the results renderer calls result.results.map() unguarded.
-      if (data?.ok === false && data?.blocked_by_instructor_lock?.length) {
-        setError(data.error);
+      // Not every ok:false carries blocked_by_instructor_lock - "course codes
+      // not found" does not - so key off ok alone.
+      if (data?.ok === false) {
+        setError(data.error ?? "Could not build a timetable for this request.");
         return;
       }
 

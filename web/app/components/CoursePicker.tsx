@@ -86,6 +86,34 @@ export function CoursePicker(props: Readonly<{
     };
   }, [term]);
 
+  // A persisted lock outlives the index it came from. If a rebuilt index
+  // leaves the course with one instructor the select renders disabled, and
+  // with none it does not render at all - either way the name is no longer a
+  // selectable option, so the user cannot clear the lock, yet it is still sent
+  // on every optimise and blocks the request. Prune it once the index is up.
+  useEffect(() => {
+    if (!indexStatus.loaded) return;
+
+    const next: Record<string, string> = {};
+    for (const code of selected) {
+      const lock = locks[code];
+      if (!lock) continue;
+      const instructors = getCourseFromIndex(term, code)?.instructors ?? [];
+      // Fewer than two instructors means the select offers no name to pick.
+      if (instructors.length > 1 && instructors.includes(lock)) {
+        next[code] = lock;
+      }
+    }
+
+    const currentCodes = Object.keys(locks);
+    const changed =
+      currentCodes.length !== Object.keys(next).length ||
+      currentCodes.some((code) => next[code] !== locks[code]);
+    // Only write when something actually changed, otherwise this effect
+    // re-triggers itself on the new `locks` identity forever.
+    if (changed) setLocks(next);
+  }, [indexStatus.loaded, term, selected, locks, setLocks]);
+
   // Search results (computed from cached index)
   const results = useMemo<CourseIndexEntry[]>(() => {
     if (!indexStatus.loaded) return [];
