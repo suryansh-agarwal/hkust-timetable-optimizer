@@ -6,6 +6,7 @@ from typing import List, Dict, Any, Optional
 from models import Course, Section
 from section_utils import section_type
 from instructor_filter import lock_is_satisfiable, section_allows, normalise
+from section_lock import section_allows_pin
 
 
 @dataclass
@@ -31,6 +32,7 @@ def build_bundles(
     course: Course,
     constraint: Optional[MatchingConstraint] = None,
     instructor_lock: Optional[str] = None,
+    section_lock: Optional[Dict[str, Any]] = None,
 ) -> List[Bundle]:
     """
     Build all valid bundles for a course.
@@ -60,7 +62,12 @@ def build_bundles(
     had_tut = any(section_type(s.section) == "TUT" for s in course.sections)
     had_lab = any(section_type(s.section) == "LAB" for s in course.sections)
 
-    sections = [s for s in course.sections if section_allows(s.instructor, instructor_lock)]
+    sections = [
+        s
+        for s in course.sections
+        if section_allows(s.instructor, instructor_lock)
+        and section_allows_pin(s.section, section_lock)
+    ]
 
     lecs, tuts, labs, oth = [], [], [], []
     for s in sections:
@@ -150,7 +157,7 @@ def build_bundles(
     # lock, a broken numeric pairing means the course is unschedulable with
     # that professor, not that we should fabricate a bundle missing a
     # required tutorial/lab.
-    if not bundles and strict_matching and not normalise(instructor_lock):
+    if not bundles and strict_matching and not normalise(instructor_lock) and not section_lock:
         # Fallback: create what we can (this means the WCQ data is inconsistent)
         for lec in lecs:
             bundles.append(Bundle(course.course_code, [lec]))
