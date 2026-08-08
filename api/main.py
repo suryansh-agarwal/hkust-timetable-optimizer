@@ -290,7 +290,12 @@ def optimize_ranked(req: OptimizeRankedRequest):
     scored = []
     for sch in unique_pool:
         s, why = score_schedule(sch, req.prefs)
-        if s != float("-inf"):
+        # Filter on the explicit flag, not on the score. This compared against
+        # float("-inf") while score_schedule returns -1e9, so it excluded
+        # nothing and a student with an impossible hard cutoff was handed six
+        # schedules that all violated it, ranked last, instead of being told no
+        # timetable exists.
+        if not why.get("rejected"):
             scored.append((s, why, sch))
 
     scored.sort(key=lambda x: x[0], reverse=True)
