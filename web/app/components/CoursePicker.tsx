@@ -138,13 +138,10 @@ export function CoursePicker(props: Readonly<{
         requested.current.add(key);
         try {
           const data = await fetchCourseSections(term, code);
-          if (cancelled) {
-            // Cancelled before we could store the result. Un-mark so the next
-            // run retries; fetchCourseSections caches successes, so the retry
-            // resolves from memory without another network request.
-            requested.current.delete(key);
-            return;
-          }
+          // Stored regardless of cancellation. The write is keyed by term and
+          // course and is idempotent, so a late arrival is a harmless cache
+          // fill, never a wrong render. Discarding it instead would strand the
+          // course with no pending fetch and nothing scheduled to retry it.
           setSectionData((prev) => ({ ...prev, [key]: data }));
           setSectionFailed((prev) => {
             if (!prev[key]) return prev;
@@ -153,15 +150,15 @@ export function CoursePicker(props: Readonly<{
             return next;
           });
         } catch {
-          // A course whose sections cannot be loaded simply offers no pins;
-          // the optimiser still works, but professor locking (below) still
-          // needs to work, so mark it failed rather than stuck "loading".
-          // Un-mark it as requested so a later render (e.g. the course list
-          // changing) can retry.
+          // Un-mark so a later run can retry, and record the failure so the
+          // course falls back to the professor-only control instead of
+          // sitting on "Loading sections...".
           requested.current.delete(key);
-          if (cancelled) return;
           setSectionFailed((prev) => ({ ...prev, [key]: true }));
         }
+        // Only after handling this course: a superseded list should not keep
+        // issuing requests for courses the student may no longer be looking at.
+        if (cancelled) return;
       }
     })();
 
