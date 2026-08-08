@@ -17,6 +17,8 @@ export type CourseIndexEntry = {
   matching_required?: boolean;
   matching_type?: "lab" | "tutorial" | "both" | null;
   header_remarks?: string[];
+  // Distinct named instructors, in section order. Absent when all sections are TBA.
+  instructors?: string[];
 };
 
 // Module-level cache for loaded indexes (keyed by term)
@@ -121,6 +123,17 @@ export function searchCourseIndex(
   return scored.slice(0, limit).map((s) => s.entry);
 }
 
+/**
+ * Look up a single course in the cached index. Returns undefined if the index
+ * has not loaded yet, so callers must tolerate a missing entry.
+ */
+export function getCourseFromIndex(
+  term: string,
+  courseCode: string
+): CourseIndexEntry | undefined {
+  return indexCache.get(term)?.find((e) => e.course_code === courseCode);
+}
+
 // ============================================================
 // Preferences Type
 // ============================================================
@@ -158,7 +171,13 @@ export async function listSubjects(term: string) {
   return res.json() as Promise<{ term: string; subjects: string[] }>;
 }
 
-export async function optimizeRanked(term: string, course_codes: string[], prefs: Prefs, max_solutions = 5) {
+export async function optimizeRanked(
+  term: string,
+  course_codes: string[],
+  prefs: Prefs,
+  max_solutions = 5,
+  instructor_locks: Record<string, string> = {}
+) {
   const res = await fetch(`${API_BASE}/optimize/ranked`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -168,6 +187,7 @@ export async function optimizeRanked(term: string, course_codes: string[], prefs
       max_solutions,
       search_limit: 2000,
       prefs,
+      instructor_locks,
     }),
   });
   if (!res.ok) {

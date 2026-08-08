@@ -215,7 +215,21 @@ export default function Home() {
   const [openSoftInfo, setOpenSoftInfo] = useState(false);
 
   const [selectedCourses, setSelectedCourses] = useState<string[]>([]);
+  const [instructorLocks, setInstructorLocks] = useState<Record<string, string>>({});
   const [selectionsLoaded, setSelectionsLoaded] = useState(false);
+
+  // A lock for a course that is no longer selected would be sent to the API
+  // and silently constrain nothing, so drop it at the point of removal.
+  function handleSetSelectedCourses(codes: string[]) {
+    setSelectedCourses(codes);
+    setInstructorLocks((prev) => {
+      const next: Record<string, string> = {};
+      for (const code of codes) {
+        if (prev[code]) next[code] = prev[code];
+      }
+      return next;
+    });
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -232,13 +246,14 @@ export default function Home() {
 
       if (!uid) {
         setSelectedCourses([]);
+        setInstructorLocks({});
         setSelectionsLoaded(true);
         return;
       }
 
       const { data: row, error } = await supabase
         .from("user_course_selections")
-        .select("courses")
+        .select("courses, instructor_locks")
         .eq("user_id", uid)
         .eq("term", term)
         .maybeSingle();
@@ -248,8 +263,10 @@ export default function Home() {
       if (error) {
         console.warn("Failed to load course selections", error);
         setSelectedCourses([]);
+        setInstructorLocks({});
       } else {
         setSelectedCourses(row?.courses ?? []);
+        setInstructorLocks(row?.instructor_locks ?? {});
       }
 
       setSelectionsLoaded(true);
@@ -273,6 +290,7 @@ export default function Home() {
               user_id: userId,
               term,
               courses: selectedCourses,
+              instructor_locks: instructorLocks,
               updated_at: new Date().toISOString(),
             },
             { onConflict: "user_id,term" }
@@ -285,7 +303,7 @@ export default function Home() {
     }, 400);
 
     return () => clearTimeout(handle);
-  }, [supabase, userId, term, selectedCourses, selectionsLoaded]);
+  }, [supabase, userId, term, selectedCourses, instructorLocks, selectionsLoaded]);
 
   // Hard free days (multi-select)
   const [hardFreeDays, setHardFreeDays] = useState<string[]>([]);
@@ -443,7 +461,17 @@ export default function Home() {
     };
 
     try {
-      const data = await optimizeRanked(term, selectedCourses, prefs, 6);
+      const data = await optimizeRanked(term, selectedCourses, prefs, 6, instructorLocks);
+
+      // Must return before setResult: no ok:false response carries a `results`
+      // key, and the results renderer calls result.results.map() unguarded.
+      // Not every ok:false carries blocked_by_instructor_lock - "course codes
+      // not found" does not - so key off ok alone.
+      if (data?.ok === false) {
+        setError(data.error ?? "Could not build a timetable for this request.");
+        return;
+      }
+
       setResult(data);
       const resultCount = data?.results?.length ?? 0;
       if (resultCount === 0) {
@@ -579,7 +607,9 @@ export default function Home() {
           <CoursePicker
             term={term}
             selected={selectedCourses}
-            setSelected={setSelectedCourses}
+            setSelected={handleSetSelectedCourses}
+            locks={instructorLocks}
+            setLocks={setInstructorLocks}
           />
           <div style={{ marginTop: 8, fontSize: 14 }}>
             <b>Selected:</b> {selectedCourses.join(", ")}

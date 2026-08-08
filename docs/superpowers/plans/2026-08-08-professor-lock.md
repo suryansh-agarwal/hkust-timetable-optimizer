@@ -32,7 +32,7 @@
 
 **Interfaces:**
 - Consumes: nothing.
-- Produces: `public.user_course_selections.instructor_locks` — `jsonb NOT NULL DEFAULT '{}'::jsonb`. Task 7 reads and writes it.
+- Produces: `public.user_course_selections.instructor_locks` — `jsonb NOT NULL DEFAULT '{}'::jsonb`. Task 6 reads and writes it.
 
 The table today is `user_course_selections(user_id uuid, term text, courses text[], updated_at timestamptz)` with primary key `(user_id, term)` and RLS enabled. This migration is additive with a default, so existing rows and the current `upsert` (which does not name columns explicitly) keep working untouched.
 
@@ -377,7 +377,10 @@ multi = [c for c in d if len(c.get('instructors') or []) > 1]
 print('courses:', len(d))
 print('with instructors:', len(withi))
 print('with 2+ names:', len(multi))
-assert len(d) == 1404, 'course count changed'
+# A narrow range, not an equality: HKUST adds and withdraws courses during
+# the term so the exact count drifts, but a partial scrape must still fail
+# loudly. Pair this with the builder's own '0 subjects failed' summary.
+assert 1390 < len(d) < 1450, 'course count outside the expected range'
 assert 1100 < len(withi) < 1200, 'unexpected named-instructor count'
 sample = next(c for c in d if c['course_code'] == 'COMP 1023')
 print('COMP 1023:', sample['instructors'])
@@ -727,11 +730,17 @@ git commit -m "feat(api): accept instructor_locks in /optimize/ranked"
 
 ---
 
-### Task 6: Professor picker in the UI
+### Task 6: Professor picker, state, and persistence
 
 **Files:**
 - Modify: `web/lib/api.ts` (`CourseIndexEntry`; add `getCourseFromIndex`; `optimizeRanked`)
 - Modify: `web/app/components/CoursePicker.tsx` (props; selected-course list)
+- Modify: `web/app/(app)/page.tsx` (state; load effect; save effect; `runOptimize`; `CoursePicker` usage)
+
+This is one task rather than two because adding required props to
+`CoursePicker` breaks the typecheck until `page.tsx` supplies them. Split
+across two commits the intermediate state would not build, so there would be
+nothing a reviewer could independently approve.
 
 **Interfaces:**
 - Consumes: the `instructors` field from Task 3.
@@ -741,7 +750,7 @@ git commit -m "feat(api): accept instructor_locks in /optimize/ranked"
   - `optimizeRanked(term, course_codes, prefs, max_solutions, instructor_locks)` — fifth parameter, defaults to `{}`
   - `CoursePicker` props gain `locks: Record<string, string>` and `setLocks: (locks: Record<string, string>) => void`
 
-  Task 7 supplies `locks` / `setLocks` and passes `instructor_locks` to `optimizeRanked`.
+  Nothing downstream consumes these; Task 7 only verifies them.
 
 - [ ] **Step 1: Extend the index type and add a lookup**
 
@@ -913,33 +922,7 @@ The selected courses are currently pills in a wrapping flex row. A dropdown does
 
 A course with a single instructor renders that name in a disabled control with an empty value, so it is informational and never sends a lock. A course with no instructor data renders no control at all — which is also what older term indexes produce until they are rebuilt.
 
-- [ ] **Step 6: Typecheck**
-
-```bash
-cd web && npx tsc --noEmit
-```
-
-Expected: fails, because `page.tsx` does not yet pass `locks` and `setLocks`. That is resolved in Task 7. Confirm the only errors are the two missing props on `CoursePicker`.
-
-- [ ] **Step 7: Commit**
-
-```bash
-git add web/lib/api.ts web/app/components/CoursePicker.tsx
-git commit -m "feat(web): add professor picker to selected courses"
-```
-
----
-
-### Task 7: Wire up state, persistence, and the request
-
-**Files:**
-- Modify: `web/app/(app)/page.tsx` (state; load effect; save effect; `runOptimize`; `CoursePicker` usage)
-
-**Interfaces:**
-- Consumes: `CoursePicker` props from Task 6, the `instructor_locks` column from Task 1, the endpoint field from Task 5.
-- Produces: nothing downstream.
-
-- [ ] **Step 1: Add the state**
+- [ ] **Step 6: Add the page state**
 
 In `page.tsx`, below `const [selectedCourses, setSelectedCourses] = useState<string[]>([]);` add:
 
@@ -947,7 +930,7 @@ In `page.tsx`, below `const [selectedCourses, setSelectedCourses] = useState<str
   const [instructorLocks, setInstructorLocks] = useState<Record<string, string>>({});
 ```
 
-- [ ] **Step 2: Prune locks when a course is removed**
+- [ ] **Step 7: Prune locks when a course is removed**
 
 Below the state declarations, add a wrapper that keeps locks consistent with the selection:
 
@@ -966,7 +949,7 @@ Below the state declarations, add a wrapper that keeps locks consistent with the
   }
 ```
 
-- [ ] **Step 3: Load locks alongside courses**
+- [ ] **Step 8: Load locks alongside courses**
 
 In the `loadUserAndSelections` effect, change the `select` to fetch both columns:
 
@@ -1003,7 +986,7 @@ And change the result handling:
       }
 ```
 
-- [ ] **Step 4: Save locks alongside courses**
+- [ ] **Step 9: Save locks alongside courses**
 
 In the debounced save effect, add the column to the upsert payload:
 
@@ -1026,7 +1009,7 @@ And add `instructorLocks` to that effect's dependency array, which becomes:
   }, [supabase, userId, term, selectedCourses, instructorLocks, selectionsLoaded]);
 ```
 
-- [ ] **Step 5: Send locks when optimising**
+- [ ] **Step 10: Send locks when optimising**
 
 In `runOptimize`, the `try` block currently reads:
 
@@ -1054,7 +1037,7 @@ Replace those three lines with:
 
 The ordering matters. `setResult(data)` runs before the existing `resultCount` check, and the JSX does `result.results.map(...)` with no guard, so storing a response that lacks `results` would throw during render.
 
-- [ ] **Step 6: Pass the props**
+- [ ] **Step 11: Pass the props**
 
 Change the `CoursePicker` usage:
 
@@ -1068,7 +1051,7 @@ Change the `CoursePicker` usage:
           />
 ```
 
-- [ ] **Step 7: Typecheck and build**
+- [ ] **Step 12: Typecheck and build**
 
 ```bash
 cd web && npx tsc --noEmit && npx next build
@@ -1076,16 +1059,16 @@ cd web && npx tsc --noEmit && npx next build
 
 Expected: both clean.
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 13: Commit**
 
 ```bash
-git add "web/app/(app)/page.tsx"
-git commit -m "feat(web): persist and apply professor locks"
+git add web/lib/api.ts web/app/components/CoursePicker.tsx "web/app/(app)/page.tsx"
+git commit -m "feat(web): add professor lock picker with persistence"
 ```
 
 ---
 
-### Task 8: End-to-end verification
+### Task 7: End-to-end verification
 
 **Files:** none modified.
 

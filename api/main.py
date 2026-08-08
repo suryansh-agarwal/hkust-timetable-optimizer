@@ -180,6 +180,8 @@ class OptimizeRankedRequest(BaseModel):
     search_limit: int = 5000         # how many feasible schedules to search/score internally
     refresh: bool = False
     use_cache: bool = True
+    # Course code -> professor. Absent key means the course is unconstrained.
+    instructor_locks: Dict[str, str] = Field(default_factory=dict)
     prefs: Preferences = Preferences()
 
 @app.get("/")
@@ -219,6 +221,7 @@ def optimize_ranked(req: OptimizeRankedRequest):
     used_matching_rules: Dict[str, Dict[str, Any]] = {}
 
     choices = []
+    blocked_by_lock: list[str] = []
     for cc in req.course_codes:
         course = course_map[cc]
         constraint = _get_matching_constraint(
@@ -227,8 +230,26 @@ def optimize_ranked(req: OptimizeRankedRequest):
             missing_catalog_entries,
             used_matching_rules,
         )
-        bundles = build_bundles(course, constraint)
+        lock = req.instructor_locks.get(cc)
+        bundles = build_bundles(course, constraint, instructor_lock=lock)
+        if not bundles and lock:
+            blocked_by_lock.append(cc)
         choices.append(BundleChoice(course_code=cc, bundles=[b.parts for b in bundles]))
+
+    # Distinct from a generic no-solution: the fix is to drop the lock, not the
+    # course, so say which lock and which course.
+    if blocked_by_lock:
+        details = ", ".join(
+            f"{cc} has no sections taught by {req.instructor_locks[cc]}"
+            for cc in blocked_by_lock
+        )
+        return {
+            "ok": False,
+            "error": f"No schedule is possible: {details}.",
+            "blocked_by_instructor_lock": blocked_by_lock,
+            "subjects_fetched": subjects_fetched,
+            "cache_misses": cache_misses,
+        }
 
     # Find a pool of feasible schedules. We'll cap by search_limit by requesting more solutions.
     pool = find_bundle_schedules(choices, max_solutions=max(req.search_limit, req.max_solutions))

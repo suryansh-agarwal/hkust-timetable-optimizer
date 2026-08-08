@@ -30,6 +30,11 @@ from typing import Any
 
 import httpx
 
+# The picker's names and the optimiser's filter must agree on what counts as
+# an unnamed instructor, so both use api/instructor_filter.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "api"))
+from instructor_filter import collect_instructors  # noqa: E402
+
 
 def fetch_subjects(api_base: str, term: str) -> list[str]:
     """Fetch list of subjects from /wcq/subjects endpoint."""
@@ -88,7 +93,13 @@ def process_subject_data(
                 "units": c.get("units"),
                 "subject": subject,
             }
-            
+
+            # Names shown in the professor picker. Omitted when every section
+            # is TBA, so the UI can hide the control entirely.
+            instructors = collect_instructors(c.get("sections") or [])
+            if instructors:
+                entry["instructors"] = instructors
+
             # Only include matching fields if matching is required
             if matching_required:
                 entry["matching_required"] = True
