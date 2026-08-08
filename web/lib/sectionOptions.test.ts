@@ -66,6 +66,17 @@ describe("optionsFor", () => {
     expect(optionsFor(MATCHED, "TUT", "L9").map((s) => s.section))
       .toEqual(["T1A", "T1B", "T2A", "T2B"]);
   });
+
+  it("falls back to every option when the pinned lecture has no group", () => {
+    const nullGroupLecture: CourseSections = {
+      ...MATCHED,
+      sections: MATCHED.sections.map((s) =>
+        s.section === "L1" ? { ...s, group: null } : s
+      ),
+    };
+    expect(optionsFor(nullGroupLecture, "TUT", "L1").map((s) => s.section))
+      .toEqual(["T1A", "T1B", "T2A", "T2B"]);
+  });
 });
 
 describe("reconcilePins", () => {
@@ -90,6 +101,21 @@ describe("reconcilePins", () => {
 
   it("does not auto-select when several options remain", () => {
     expect(reconcilePins(MATCHED, { lecture: "L1" })).toEqual({ lecture: "L1" });
+  });
+
+  it("does not auto-select on an unmatched course even with a single option", () => {
+    // Only one tutorial exists, but matching is not required for this course,
+    // so pinning the lecture must not invent a tutorial constraint.
+    const unmatchedSingleTut: CourseSections = {
+      ...UNMATCHED,
+      sections: [sec("L1", "LEC", "1"), sec("L2", "LEC", "2"), sec("T1", "TUT", "1")],
+    };
+    expect(reconcilePins(unmatchedSingleTut, { lecture: "L1" })).toEqual({ lecture: "L1" });
+  });
+
+  it("drops a lab pin for a course with no lab sections without disturbing other pins", () => {
+    expect(reconcilePins(MATCHED, { lecture: "L1", tutorial: "T1B", lab: "LA1" }))
+      .toEqual({ lecture: "L1", tutorial: "T1B" });
   });
 
   it("leaves pins alone on an unmatched course", () => {
