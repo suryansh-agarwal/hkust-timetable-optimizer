@@ -49,12 +49,20 @@ function LoginContent() {
     try {
       const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin;
 
-      await supabase.auth.signInWithOtp({
+      // signInWithOtp resolves with an error rather than throwing, so without
+      // this check a rejected request - rate limit, blocked address, provider
+      // outage - still told the student their link was on its way.
+      const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
           emailRedirectTo: `${siteUrl}/auth/callback?next=${encodeURIComponent(nextPath)}`,
         },
       });
+
+      if (error) {
+        setErr(error.message);
+        return;
+      }
 
       setNotice("Magic link sent. Check your email to continue.");
     } catch {
