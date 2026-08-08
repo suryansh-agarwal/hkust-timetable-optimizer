@@ -36,3 +36,15 @@ def section_allows_pin(section_code: str, section_lock: Optional[Dict[str, Any]]
         return True
 
     return section_code.strip().upper() == str(pinned).strip().upper()
+
+
+def has_pin(section_lock: Optional[Dict[str, Any]]) -> bool:
+    """True when at least one component is actually pinned.
+
+    A dict whose values are all empty is not a pin. section_allows_pin already
+    treats an empty value as unconstrained; callers deciding "is a pin active
+    at all?" must use the same definition or the two will disagree.
+    """
+    if not section_lock:
+        return False
+    return any(bool(str(v).strip()) for v in section_lock.values() if v)

@@ -1,4 +1,4 @@
-from section_lock import COMPONENT_KEYS, section_allows_pin
+from section_lock import COMPONENT_KEYS, has_pin, section_allows_pin
 
 
 def test_no_lock_allows_everything():
@@ -46,3 +46,15 @@ def test_empty_pin_value_is_treated_as_no_pin():
 
 def test_component_keys_cover_the_three_real_types():
     assert COMPONENT_KEYS == {"LEC": "lecture", "TUT": "tutorial", "LAB": "lab"}
+
+
+def test_has_pin_is_false_for_no_or_empty_locks():
+    assert has_pin(None) is False
+    assert has_pin({}) is False
+    assert has_pin({"lecture": ""}) is False
+    assert has_pin({"lecture": None}) is False
+
+
+def test_has_pin_is_true_when_a_real_value_is_present():
+    assert has_pin({"lecture": "L1"}) is True
+    assert has_pin({"lecture": "", "tutorial": "T1A"}) is True

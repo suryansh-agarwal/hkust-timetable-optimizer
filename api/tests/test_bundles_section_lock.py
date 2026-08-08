@@ -67,6 +67,24 @@ def test_conflicting_lecture_and_tutorial_pins_block_the_course():
     assert build_bundles(course, matched, section_lock={"lecture": "L1", "tutorial": "T2A"}) == []
 
 
+def test_empty_valued_section_lock_does_not_suppress_the_inconsistent_data_fallback():
+    # L1/L2 have no matching tutorial group ("3"), so strict tutorial matching
+    # finds nothing and the WCQ-inconsistent-data fallback should kick in --
+    # the same as if section_lock were None -- because a dict of empty values
+    # is not a real pin.
+    course = make_course([
+        ("L1", "WU, Yueping"),
+        ("L2", "WU, Yueping"),
+        ("T3A", "WU, Yueping"),
+    ])
+    matched = MatchingConstraint(matching_required=True, matching_type="tutorial")
+    no_lock_result = build_bundles(course, matched, section_lock=None)
+    empty_lock_result = build_bundles(
+        course, matched, section_lock={"lecture": "", "tutorial": None}
+    )
+    assert empty_lock_result == no_lock_result
+
+
 def test_section_pin_and_instructor_lock_compose():
     course = make_course([
         ("L1", "WU, Yueping"),
