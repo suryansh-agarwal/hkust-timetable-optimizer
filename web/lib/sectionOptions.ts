@@ -6,8 +6,12 @@ type PinnableKind = keyof typeof KIND_TO_KEY;
 
 /**
  * Does the course's matching rule tie this component to the lecture?
+ *
+ * Exported so every caller — the narrowing here and the disabled-select
+ * logic in CoursePicker — shares one implementation instead of each
+ * re-deriving the rule and risking drift.
  */
-function matchingApplies(data: CourseSections, kind: PinnableKind): boolean {
+export function matchingAppliesTo(data: CourseSections, kind: PinnableKind): boolean {
   if (!data.matching_required || kind === "LEC") return false;
   const wanted = kind === "TUT" ? "tutorial" : "lab";
   return data.matching_type === wanted || data.matching_type === "both";
@@ -26,7 +30,7 @@ export function optionsFor(
   lecturePin?: string
 ): CourseSection[] {
   const all = data.sections.filter((s) => s.type === kind);
-  if (!matchingApplies(data, kind) || !lecturePin) return all;
+  if (!matchingAppliesTo(data, kind) || !lecturePin) return all;
 
   const lecture = data.sections.find((s) => s.section === lecturePin);
   // An unknown or ungrouped lecture cannot narrow anything; showing every
@@ -60,7 +64,7 @@ export function reconcilePins(data: CourseSections, pins: SectionLock): SectionL
     const current = pins[key];
     if (current && options.some((s) => s.section === current)) {
       next[key] = current;
-    } else if (matchingApplies(data, kind) && next.lecture && options.length === 1) {
+    } else if (matchingAppliesTo(data, kind) && next.lecture && options.length === 1) {
       // Exactly one valid choice: pin it so the request matches what the
       // disabled control shows.
       next[key] = options[0].section;

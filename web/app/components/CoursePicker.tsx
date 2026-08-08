@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState, useMemo, type ReactNode } from "react";
+import { useEffect, useRef, useState, useMemo, type ReactNode } from "react";
 import { loadCourseIndex, searchCourseIndex, getIndexCacheStatus, getCourseFromIndex, fetchCourseSections, CourseIndexEntry } from "@/lib/api";
 import type { CourseSections, SectionLock } from "@/lib/api";
-import { optionsFor, reconcilePins } from "@/lib/sectionOptions";
+import { optionsFor, reconcilePins, matchingAppliesTo } from "@/lib/sectionOptions";
 
 function IndexStatusBadge({ loading, error, ready, count }: Readonly<{ loading: boolean; error: string; ready: boolean; count: number }>) {
   if (loading) {
@@ -111,24 +111,50 @@ export function CoursePicker(props: Readonly<{
     };
   }, [term]);
 
+  // Keyed by `${term}:${code}`, matching api.ts's own cache key, so a course
+  // code shared between terms can never be read as already-fetched or
+  // reconciled against the wrong term's sections.
   const [sectionData, setSectionData] = useState<Record<string, CourseSections>>({});
+  const [sectionFailed, setSectionFailed] = useState<Record<string, boolean>>({});
+  // Tracks which `${term}:${code}` keys have an in-flight or completed
+  // request, independent of React state, so the fetch effect below never
+  // issues a second request for a key it has already started.
+  const requested = useRef<Set<string>>(new Set());
 
   // Section data is per course and fetched on demand, so a student who picks
   // five courses pays for five small requests rather than a doubled index.
+  // Depends on [term, selected] only - not on sectionData - because a
+  // per-course write inside the loop below would otherwise change
+  // `sectionData` mid-flight and re-trigger this same effect with a new
+  // "missing" list while the previous run is still awaiting its next fetch.
   useEffect(() => {
     let cancelled = false;
-    const missing = selected.filter((code) => !sectionData[code]);
+    const missing = selected.filter((code) => !requested.current.has(`${term}:${code}`));
     if (missing.length === 0) return;
 
     (async () => {
       for (const code of missing) {
+        const key = `${term}:${code}`;
+        requested.current.add(key);
         try {
           const data = await fetchCourseSections(term, code);
           if (cancelled) return;
-          setSectionData((prev) => ({ ...prev, [code]: data }));
+          setSectionData((prev) => ({ ...prev, [key]: data }));
+          setSectionFailed((prev) => {
+            if (!prev[key]) return prev;
+            const next = { ...prev };
+            delete next[key];
+            return next;
+          });
         } catch {
-          // A course whose sections cannot be loaded simply offers no pins.
-          // The optimiser still works; only the picker is degraded.
+          // A course whose sections cannot be loaded simply offers no pins;
+          // the optimiser still works, but professor locking (below) still
+          // needs to work, so mark it failed rather than stuck "loading".
+          // Un-mark it as requested so a later render (e.g. the course list
+          // changing) can retry.
+          requested.current.delete(key);
+          if (cancelled) return;
+          setSectionFailed((prev) => ({ ...prev, [key]: true }));
         }
       }
     })();
@@ -136,12 +162,7 @@ export function CoursePicker(props: Readonly<{
     return () => {
       cancelled = true;
     };
-  }, [term, selected, sectionData]);
-
-  // Section data is per term; drop it when the term changes.
-  useEffect(() => {
-    setSectionData({});
-  }, [term]);
+  }, [term, selected]);
 
   // reconcilePins is idempotent, so this settles in one pass: it only writes
   // when a pin was dropped or auto-filled.
@@ -150,7 +171,7 @@ export function CoursePicker(props: Readonly<{
     const next: Record<string, SectionLock> = {};
 
     for (const code of selected) {
-      const data = sectionData[code];
+      const data = sectionData[`${term}:${code}`];
       const current = sectionLocks[code] ?? {};
       if (!data) {
         if (Object.keys(current).length > 0) next[code] = current;
@@ -167,7 +188,7 @@ export function CoursePicker(props: Readonly<{
     if (changed || Object.keys(next).length !== Object.keys(sectionLocks).length) {
       setSectionLocks(next);
     }
-  }, [selected, sectionData, sectionLocks, setSectionLocks]);
+  }, [term, selected, sectionData, sectionLocks, setSectionLocks]);
 
   // A persisted lock outlives the index it came from. If a rebuilt index
   // leaves the course with one instructor the select renders disabled, and
@@ -275,9 +296,37 @@ export function CoursePicker(props: Readonly<{
                 </div>
 
                 {(() => {
-                  const data = sectionData[code];
+                  const sectionKey = `${term}:${code}`;
+                  const data = sectionData[sectionKey];
                   const pins = sectionLocks[code] ?? {};
                   if (!data) {
+                    if (sectionFailed[sectionKey]) {
+                      // Section fetch failed permanently: fall back to the
+                      // professor-only control that shipped in 6bf408d,
+                      // rather than let instructor locking silently
+                      // disappear because of an unrelated fetch failure.
+                      return instructors.length > 0 ? (
+                        <select
+                          value={locks[code] ?? ""}
+                          disabled={onlyOne}
+                          onChange={(e) => setLock(code, e.target.value)}
+                          aria-label={`Professor for ${code}`}
+                          title={onlyOne ? "Only one instructor teaches this course" : "Only use sections taught by this professor"}
+                          style={{ padding: 4, fontSize: 12, borderRadius: 6, maxWidth: 220 }}
+                        >
+                          {onlyOne ? (
+                            <option value="">{instructors[0]}</option>
+                          ) : (
+                            <>
+                              <option value="">Any professor</option>
+                              {instructors.map((name) => (
+                                <option key={name} value={name}>{name}</option>
+                              ))}
+                            </>
+                          )}
+                        </select>
+                      ) : null;
+                    }
                     return instructors.length > 0 ? (
                       <div style={{ fontSize: 11, color: "var(--text-faint)" }}>Loading sections…</div>
                     ) : null;
@@ -330,7 +379,7 @@ export function CoursePicker(props: Readonly<{
                     const key = kind === "TUT" ? "tutorial" : "lab";
                     const options = optionsFor(data, kind, pins.lecture);
                     if (options.length === 0) continue;
-                    const auto = data.matching_required && !!pins.lecture && options.length === 1;
+                    const auto = matchingAppliesTo(data, kind) && !!pins.lecture && options.length === 1;
                     rows.push(
                       <label key={kind} style={{ display: "flex", flexDirection: "column", gap: 2, fontSize: 11, color: "var(--text-muted)" }}>
                         {kind === "TUT" ? "Tutorial" : "Lab"}
