@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 from fastapi import Body
 
 from bundles import build_bundles, MatchingConstraint
+from instructor_filter import normalise
 from section_lock import has_pin
 from optimizer_bundles import BundleChoice, find_bundle_schedules, schedule_to_json as schedule_to_json_bundles
 
@@ -200,7 +201,10 @@ def wcq_subjects(term: str = Query(...)):
 def _describe_lock(instructor_lock: Optional[str], section_lock: Optional[Dict[str, str]]) -> str:
     """Human-readable summary of why a course was blocked, naming the pins."""
     parts = []
-    if instructor_lock:
+    # normalise, not truthiness: instructor_filter owns "is this lock real?",
+    # and a whitespace-only value that no longer filters anything must not be
+    # printed back as "professor    ".
+    if normalise(instructor_lock):
         parts.append(f"professor {instructor_lock}")
     for key, label in (("lecture", "lecture"), ("tutorial", "tutorial"), ("lab", "lab")):
         value = (section_lock or {}).get(key)
@@ -249,7 +253,9 @@ def optimize_ranked(req: OptimizeRankedRequest):
         lock = req.instructor_locks.get(cc)
         pins = req.section_locks.get(cc)
         bundles = build_bundles(course, constraint, instructor_lock=lock, section_lock=pins)
-        if not bundles and (lock or has_pin(pins)):
+        # Same definition of "a lock is set" that build_bundles applies, so a
+        # whitespace-only lock cannot be blamed for a block it did not cause.
+        if not bundles and (normalise(lock) or has_pin(pins)):
             blocked_by_lock.append(cc)
         choices.append(BundleChoice(course_code=cc, bundles=[b.parts for b in bundles]))
 
@@ -445,7 +451,10 @@ def course_sections(term: str = Query(...), course_code: str = Query(...)):
     matching rules depend on them, and a second implementation of section
     numbering on the client would eventually disagree with this one.
     """
-    normalized = course_code.strip().upper()
+    # normalize_code, not a second hand-rolled strip/upper: it also collapses
+    # internal whitespace, so "COMP  2011" resolves here exactly as it does in
+    # the mini-catalog lookup below instead of 404ing.
+    normalized = normalize_code(course_code)
     course_map, subjects_fetched, cache_misses = _load_courses_with_cache(
         term, [normalized], refresh=False, use_cache=True
     )
@@ -458,7 +467,7 @@ def course_sections(term: str = Query(...), course_code: str = Query(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-    entry = mini_catalog.get(normalize_code(normalized)) or {}
+    entry = mini_catalog.get(normalized) or {}
 
     return {
         "course_code": course.course_code,

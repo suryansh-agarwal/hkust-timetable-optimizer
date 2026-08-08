@@ -74,6 +74,17 @@ export function CoursePicker(props: Readonly<{
     } else {
       delete updated[kind];
     }
+    // Changing or clearing the lecture re-narrows the other components, so any
+    // tutorial/lab pin derived from the old lecture is stale - including one
+    // narrowing auto-selected, which the student never chose and would
+    // otherwise keep being sent to the optimiser. Drop them and let
+    // reconcilePins re-derive from the new lecture.
+    // `?? ""` so selecting a professor on a course with no lecture pin is not
+    // read as a lecture change and does not wipe a tutorial the student chose.
+    if (kind === "lecture" && (current.lecture ?? "") !== value) {
+      delete updated.tutorial;
+      delete updated.lab;
+    }
     setSectionLocks({ ...sectionLocks, [courseCode]: updated });
   }
 
@@ -338,7 +349,7 @@ export function CoursePicker(props: Readonly<{
                   const lectures = optionsFor(data, "LEC");
                   const rows: ReactNode[] = [];
 
-                  if (lectures.length > 0 || instructors.length > 0) {
+                  if (lectures.length > 0 || instructors.length > 1) {
                     rows.push(
                       <label key="lec" style={{ display: "flex", flexDirection: "column", gap: 2, fontSize: 11, color: "var(--text-muted)" }}>
                         Lecture
@@ -357,7 +368,11 @@ export function CoursePicker(props: Readonly<{
                           style={{ padding: 4, fontSize: 12, borderRadius: 6, maxWidth: 240 }}
                         >
                           <option value="">Any</option>
-                          {instructors.length > 0 && (
+                          {/* Same threshold the prune effect above applies. A
+                              course with one instructor has nothing to choose,
+                              and offering the name anyway made the control
+                              snap back to "Any" the moment it was picked. */}
+                          {instructors.length > 1 && (
                             <optgroup label="Professor">
                               {instructors.map((n) => (
                                 <option key={n} value={`prof:${n}`}>{n}</option>
@@ -378,7 +393,11 @@ export function CoursePicker(props: Readonly<{
                     );
                   }
 
-                  for (const kind of ["TUT", "LAB"] as const) {
+                  // A lecture-less course schedules exactly one of its sections,
+                  // so the backend rejects any pin on it rather than silently
+                  // dropping one. Do not offer a control the request cannot
+                  // honour; the Lecture/professor row above still renders.
+                  for (const kind of lectures.length > 0 ? (["TUT", "LAB"] as const) : []) {
                     const key = kind === "TUT" ? "tutorial" : "lab";
                     const options = optionsFor(data, kind, pins.lecture);
                     if (options.length === 0) continue;

@@ -26,6 +26,23 @@ LEC_TUT = [
     ("T2A", "WU, Yueping"),
 ]
 
+LEC_TUT_LAB = [
+    ("L1", "WU, Yueping"),
+    ("L2", "WU, Yueping"),
+    ("T1A", "WU, Yueping"),
+    ("T2A", "WU, Yueping"),
+    ("LA1", "WU, Yueping"),
+    ("LA2", "WU, Yueping"),
+]
+
+# Shaped like RMBI 4980: tutorials and labs, no lecture at all.
+TUT_LAB_ONLY = [
+    ("T1", "WU, Yueping"),
+    ("T2", "WU, Yueping"),
+    ("LA1", "WU, Yueping"),
+    ("LA2", "WU, Yueping"),
+]
+
 
 def test_no_pins_is_unchanged():
     course = make_course(LEC_TUT)
@@ -83,6 +100,40 @@ def test_empty_valued_section_lock_does_not_suppress_the_inconsistent_data_fallb
         course, matched, section_lock={"lecture": "", "tutorial": None}
     )
     assert empty_lock_result == no_lock_result
+
+
+def test_tutorial_pin_naming_a_missing_tutorial_blocks_the_course():
+    # The emptied-bucket guard has three disjuncts; this covers the tutorial one.
+    course = make_course(LEC_TUT)
+    assert build_bundles(course, MatchingConstraint(), section_lock={"tutorial": "T9"}) == []
+
+
+def test_lab_pin_constrains_only_labs():
+    course = make_course(LEC_TUT_LAB)
+    found = sections_in(build_bundles(course, MatchingConstraint(), section_lock={"lab": "LA1"}))
+    # Lectures and tutorials stay free; only the labs are narrowed.
+    assert found == {"L1", "L2", "T1A", "T2A", "LA1"}
+
+
+def test_matching_both_narrows_tutorial_and_lab_to_the_pinned_lecture_group():
+    course = make_course(LEC_TUT_LAB)
+    matched = MatchingConstraint(matching_required=True, matching_type="both")
+    found = sections_in(build_bundles(course, matched, section_lock={"lecture": "L1"}))
+    assert found == {"L1", "T1A", "LA1"}
+
+
+def test_lecture_less_course_without_pins_still_yields_standalone_bundles():
+    course = make_course(TUT_LAB_ONLY)
+    bundles = build_bundles(course, MatchingConstraint())
+    assert [[p.section for p in b.parts] for b in bundles] == [["T1"], ["T2"], ["LA1"], ["LA2"]]
+
+
+def test_pin_on_a_lecture_less_course_is_rejected_rather_than_ignored():
+    # Every section of a lecture-less course becomes its own standalone bundle
+    # and the optimiser picks exactly one, so a pin here cannot be honoured.
+    # Blocking the course surfaces that instead of quietly dropping the pin.
+    course = make_course(TUT_LAB_ONLY)
+    assert build_bundles(course, MatchingConstraint(), section_lock={"tutorial": "T2"}) == []
 
 
 def test_section_pin_and_instructor_lock_compose():

@@ -52,6 +52,11 @@ export function reconcilePins(data: CourseSections, pins: SectionLock): SectionL
   const next: SectionLock = {};
 
   const lectures = optionsFor(data, "LEC");
+  // A lecture-less course schedules exactly one of its sections, so the backend
+  // rejects any pin on it rather than honouring one. Nothing is selectable, and
+  // a pin kept here would block every optimise with no control left to clear it.
+  if (lectures.length === 0) return next;
+
   if (pins.lecture && lectures.some((s) => s.section === pins.lecture)) {
     next.lecture = pins.lecture;
   }

@@ -86,6 +86,15 @@ def build_bundles(
     if not lecs and not tuts and not labs:
         return [Bundle(course.course_code, [s]) for s in sections]
 
+    # A lecture-less course emits one standalone bundle per section and the
+    # optimiser then picks exactly one of them, so a pin cannot survive: the
+    # student would get a single unpinned tutorial or lab and no sign that the
+    # pin was dropped. The emptied-bucket guard above cannot see this, because
+    # the pinned section is still present - it is simply not required. Pinning
+    # is unsupported here, so say so by blocking the course instead.
+    if not lecs and has_pin(section_lock):
+        return []
+
     # If lecs are missing but there are tuts/labs, treat all as standalone (rare)
     if not lecs:
         return [Bundle(course.course_code, [s]) for s in sections]

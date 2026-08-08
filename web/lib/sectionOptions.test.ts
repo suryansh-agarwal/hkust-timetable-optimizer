@@ -128,6 +128,22 @@ describe("reconcilePins", () => {
       .toEqual({ lecture: "L1" });
   });
 
+  it("drops every pin on a lecture-less course", () => {
+    // RMBI 4980 shape: tutorials and labs, no lecture. The backend blocks any
+    // pin here, and the picker renders no tutorial/lab control, so a pin that
+    // survived would be unclearable and would block every optimise.
+    const noLectures: CourseSections = {
+      course_code: "RMBI 4980",
+      matching_required: false,
+      matching_type: null,
+      sections: [
+        sec("T1", "TUT", "1"), sec("T2", "TUT", "2"),
+        sec("LA1", "LAB", "1"), sec("LA2", "LAB", "2"),
+      ],
+    };
+    expect(reconcilePins(noLectures, { tutorial: "T2", lab: "LA1" })).toEqual({});
+  });
+
   it("is idempotent", () => {
     const once = reconcilePins(MATCHED, { lecture: "L2", tutorial: "T1B" });
     expect(reconcilePins(MATCHED, once)).toEqual(once);
