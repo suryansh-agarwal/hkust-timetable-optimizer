@@ -154,9 +154,16 @@ function computeStatsFromMeetings(meetings: Meeting[]) {
   const usedDays = days.filter((d) => byDay[d].length > 0);
   const freeDays = days.filter((d) => byDay[d].length === 0);
 
-  // Latest end time across week
+  // Latest end time across the week, and the day it falls on - "18:50" alone
+  // does not tell you which day you are stuck on campus until the evening.
   let latestEnd = -1;
-  for (const m of meetings) latestEnd = Math.max(latestEnd, m.end_min);
+  let latestEndDay: string | null = null;
+  for (const m of meetings) {
+    if (m.end_min > latestEnd) {
+      latestEnd = m.end_min;
+      latestEndDay = m.day;
+    }
+  }
 
   // Total gaps per day (time between consecutive classes)
   let gapsMin = 0;
@@ -177,6 +184,7 @@ function computeStatsFromMeetings(meetings: Meeting[]) {
     freeDaysCount: freeDays.length,
     freeDays,
     latestEndMin: latestEnd,
+    latestEndDay,
     earliestStartMin: earliestStart === 99999 ? null : earliestStart,
     gapsMin,
   };
@@ -922,8 +930,13 @@ export default function Home() {
 
               const isActive = i === activeIdx;
               const isPinned = pinned.some((p) => p.term === term && p.sourceIdx === i);
-              const penalties = (r.breakdown?.penalties ?? []) as { type: string; day?: string; cutoff?: string; minutes?: number }[];
-              const bonuses = (r.breakdown?.bonuses ?? []) as { type: string; value?: number }[];
+              // The gaps penalty and the free-days bonus are already stated
+              // exactly above as "Gaps: N min" and "Free days: N (...)", so as
+              // chips they only repeat the numbers in a noisier form.
+              const penalties = ((r.breakdown?.penalties ?? []) as { type: string; day?: string; cutoff?: string; minutes?: number }[])
+                .filter((p) => p.type !== "gaps_minutes");
+              const bonuses = ((r.breakdown?.bonuses ?? []) as { type: string; value?: number }[])
+                .filter((b) => b.type !== "free_days");
 
               return (
                 <div
@@ -981,7 +994,12 @@ export default function Home() {
                       Gaps: <b>{stats.gapsMin}</b> min
                     </div>
                     <div>
-                      Latest end: <b>{stats.latestEndMin >= 0 ? minutesToTime(stats.latestEndMin) : "-"}</b>
+                      Latest end:{" "}
+                      <b>
+                        {stats.latestEndMin >= 0
+                          ? `${stats.latestEndDay ?? ""} ${minutesToTime(stats.latestEndMin)}`.trim()
+                          : "-"}
+                      </b>
                     </div>
                   </div>
 
@@ -1029,12 +1047,19 @@ export default function Home() {
           <div style={{ marginTop: 8, display: "flex", gap: 12, flexWrap: "wrap" }}>
             <div style={{ fontWeight: 700 }}>Score: {active?.score.toFixed(1)}</div>
             <div style={{ fontSize: 13, color: "var(--text-body)" }}>
-              {(active?.breakdown?.penalties as { type: string }[] | undefined)?.map((p, idx: number) => (
-                <span key={idx} style={{ marginRight: 8 }}>❌ {p.type}</span>
-              ))}
-              {(active?.breakdown?.bonuses as { type: string }[] | undefined)?.map((b, idx: number) => (
-                <span key={idx} style={{ marginRight: 8 }}>✅ {b.type}</span>
-              ))}
+              {/* Same two omissions as the cards above: the gaps penalty and
+                  the free-days bonus are already stated per option, so
+                  repeating them here adds nothing. */}
+              {(active?.breakdown?.penalties as { type: string }[] | undefined)
+                ?.filter((p) => p.type !== "gaps_minutes")
+                .map((p, idx: number) => (
+                  <span key={idx} style={{ marginRight: 8 }}>❌ {p.type}</span>
+                ))}
+              {(active?.breakdown?.bonuses as { type: string }[] | undefined)
+                ?.filter((b) => b.type !== "free_days")
+                .map((b, idx: number) => (
+                  <span key={idx} style={{ marginRight: 8 }}>✅ {b.type}</span>
+                ))}
             </div>
           </div>
 
