@@ -6,6 +6,13 @@ from models import Section
 
 DAY_ORDER = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]
 
+# Score returned for a schedule that violates a hard constraint. Deliberately
+# finite rather than -inf so it stays JSON-serialisable if it ever reaches a
+# response. Callers must decide on breakdown["rejected"], never on this value:
+# comparing against a sentinel is exactly how hard constraints silently stopped
+# being enforced once the two drifted apart.
+REJECTED_SCORE = -1e9
+
 def hhmm_to_min(hhmm: str) -> int:
     h, m = hhmm.split(":")
     return int(h) * 60 + int(m)
@@ -96,18 +103,19 @@ def score_schedule(schedule: Dict[str, List[Section]], prefs) -> Tuple[float, Di
     score = 0.0
     breakdown = {"rejected": False, "bonuses": [], "penalties": []}
 
-    # Hard free days: apply moderate penalties to keep scores comparable
+    # Hard free days reject, like the other hard constraints below. A flat
+    # penalty made this weaker than the soft setting, which applies the same
+    # -200 when violated but also grants +50 when satisfied - so "hard" could
+    # never earn the bonus and could always be traded away.
     for d in prefs.hard_free_days:
         if violates_free_day(ms, d):
-            penalty_val = -200
+            breakdown["rejected"] = True
             breakdown["penalties"].append({
                 "type": "hard_free_day_violation",
                 "day": d,
-                "value": penalty_val,
+                "value": -999999,
             })
-            # Penalize but do not reject the schedule
-            # to keep results comparable.
-            score += penalty_val
+            return REJECTED_SCORE, breakdown
 
     # Hard no-after cutoffs
     for d, hhmm in prefs.hard_no_after.items():
@@ -120,7 +128,7 @@ def score_schedule(schedule: Dict[str, List[Section]], prefs) -> Tuple[float, Di
                 "cutoff": hhmm,
                 "value": -999999,
             })
-            return -1e9, breakdown
+            return REJECTED_SCORE, breakdown
 
     # Hard no-before cutoffs
     for d, hhmm in prefs.hard_no_before.items():
@@ -133,7 +141,7 @@ def score_schedule(schedule: Dict[str, List[Section]], prefs) -> Tuple[float, Di
                 "cutoff": hhmm,
                 "value": -999999,
             })
-            return -1e9, breakdown
+            return REJECTED_SCORE, breakdown
 
     # --- scoring (higher is better) ---
 
