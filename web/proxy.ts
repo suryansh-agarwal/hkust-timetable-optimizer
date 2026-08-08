@@ -26,7 +26,7 @@ function withDebugHeaders(
   res: NextResponse,
   info: { decision: string; hasUser: boolean; allowed: boolean; domain: string }
 ) {
-  res.headers.set("x-hkust-gate", "middleware-hit");
+  res.headers.set("x-hkust-gate", "proxy-hit");
   res.headers.set("x-hkust-decision", info.decision);
   res.headers.set("x-hkust-has-user", info.hasUser ? "yes" : "no");
   res.headers.set("x-hkust-allowed", info.allowed ? "yes" : "no");
@@ -35,7 +35,7 @@ function withDebugHeaders(
   return res;
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = getKey();
 
