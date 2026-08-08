@@ -120,25 +120,29 @@ export function CoursePicker(props: Readonly<{
 
   // Section data is per course and fetched on demand, so a student who picks
   // five courses pays for five small requests rather than a doubled index.
-  // Depends on [term, selected] only - not on sectionData - because a
-  // per-course write inside the loop below would otherwise change
-  // `sectionData` mid-flight and re-trigger this same effect with a new
-  // "missing" list while the previous run is still awaiting its next fetch.
+  // Depends on [term, selected] only - not on sectionData - because each
+  // completed fetch writes sectionData, which would otherwise re-trigger this
+  // effect and re-request whatever was still in flight. The `requested` ref is
+  // what makes a key fetch-once instead.
   useEffect(() => {
-    let cancelled = false;
     const missing = selected.filter((code) => !requested.current.has(`${term}:${code}`));
     if (missing.length === 0) return;
 
-    (async () => {
-      for (const code of missing) {
-        const key = `${term}:${code}`;
-        requested.current.add(key);
-        try {
-          const data = await fetchCourseSections(term, code);
-          // Stored regardless of cancellation. The write is keyed by term and
-          // course and is idempotent, so a late arrival is a harmless cache
-          // fill, never a wrong render. Discarding it instead would strand the
-          // course with no pending fetch and nothing scheduled to retry it.
+    // Concurrent, not sequential: a student who adds five courses should not
+    // wait for five round trips in series before the last one's controls
+    // appear. Safe to fan out because the backend takes a per-subject file
+    // lock around the WCQ scrape, so two courses in the same subject queue on
+    // that lock instead of scraping twice.
+    //
+    // No cancellation flag: every request is already in flight by the time the
+    // selection could change, so there is nothing left to stop. The writes are
+    // keyed by term and course and idempotent, which makes a late arrival a
+    // harmless cache fill rather than a wrong render.
+    for (const code of missing) {
+      const key = `${term}:${code}`;
+      requested.current.add(key);
+      fetchCourseSections(term, code)
+        .then((data) => {
           setSectionData((prev) => ({ ...prev, [key]: data }));
           setSectionFailed((prev) => {
             if (!prev[key]) return prev;
@@ -146,22 +150,15 @@ export function CoursePicker(props: Readonly<{
             delete next[key];
             return next;
           });
-        } catch {
+        })
+        .catch(() => {
           // Un-mark so a later run can retry, and record the failure so the
           // course falls back to the professor-only control instead of
           // sitting on "Loading sections...".
           requested.current.delete(key);
           setSectionFailed((prev) => ({ ...prev, [key]: true }));
-        }
-        // Only after handling this course: a superseded list should not keep
-        // issuing requests for courses the student may no longer be looking at.
-        if (cancelled) return;
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
+        });
+    }
   }, [term, selected]);
 
   // reconcilePins is idempotent, so this settles in one pass: it only writes
