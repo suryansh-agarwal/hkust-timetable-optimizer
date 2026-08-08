@@ -34,7 +34,7 @@ from wcq_subjects import list_subjects
 from catalog_state import load_state
 
 from mini_catalog import load_mini_catalog, normalize_code
-from section_utils import section_type
+from section_utils import section_type, group_key
 
 app = FastAPI()
 
@@ -416,6 +416,50 @@ def optimize_bundles(req: OptimizeBasicRequest):
     }
     
     return result
+
+
+@app.get("/course/sections")
+def course_sections(term: str = Query(...), course_code: str = Query(...)):
+    """
+    Sections for one course, for the section picker.
+
+    `type` and `group` are computed here rather than in the browser: the
+    matching rules depend on them, and a second implementation of section
+    numbering on the client would eventually disagree with this one.
+    """
+    normalized = course_code.strip().upper()
+    course_map, subjects_fetched, cache_misses = _load_courses_with_cache(
+        term, [normalized], refresh=False, use_cache=True
+    )
+    course = course_map.get(normalized)
+    if not course:
+        raise HTTPException(status_code=404, detail=f"Course not found: {course_code}")
+
+    try:
+        mini_catalog = load_mini_catalog(term)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    entry = mini_catalog.get(normalize_code(normalized)) or {}
+
+    return {
+        "course_code": course.course_code,
+        "matching_required": bool(entry.get("matching_required", False)),
+        "matching_type": entry.get("matching_type"),
+        "sections": [
+            {
+                "section": s.section,
+                "type": section_type(s.section),
+                "group": group_key(s.section),
+                "instructor": s.instructor,
+                "meetings": [
+                    {"day": m.day, "start": m.start, "end": m.end} for m in s.meetings
+                ],
+            }
+            for s in course.sections
+        ],
+        "_meta": {"subjects_fetched": subjects_fetched, "cache_misses": cache_misses},
+    }
 
 
 @app.get("/health")
