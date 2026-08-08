@@ -195,9 +195,16 @@ function formatDayList(days: string[]) {
   return days.join(", ");
 }
 
-function penaltyLabel(p: { type: string; day?: string; cutoff?: string; minutes?: number; shape?: string }) {
-  // make the labels less ugly than raw types
+type Penalty = { type: string; day?: string; cutoff?: string; minutes?: number; shape?: string };
+type Bonus = { type: string; day?: string; count?: number; value?: number };
+
+// Covers every penalty type scoring.py can emit. Anything unlabelled falls
+// through to its raw name, which is what used to leak "soft_no_before" into
+// the UI, so add a case here when adding a penalty.
+function penaltyLabel(p: Penalty) {
   if (p.type === "soft_no_after") return `After cutoff (${p.day} ${p.cutoff})`;
+  if (p.type === "soft_no_before") return `Before cutoff (${p.day} ${p.cutoff})`;
+  if (p.type === "soft_free_day") return `${p.day} not free`;
   if (p.type === "gaps_minutes") {
     const shapeLabel =
       p.shape === "consolidated" ? ", prefer 1 long" : p.shape === "fragmented" ? ", prefer short" : "";
@@ -207,8 +214,9 @@ function penaltyLabel(p: { type: string; day?: string; cutoff?: string; minutes?
   return p.type;
 }
 
-function bonusLabel(b: { type: string; value?: number }) {
+function bonusLabel(b: Bonus) {
   if (b.type === "free_days") return `Free days (+${b.value})`;
+  if (b.type === "soft_free_day") return `${b.day} free`;
   return b.type;
 }
 
@@ -933,9 +941,9 @@ export default function Home() {
               // The gaps penalty and the free-days bonus are already stated
               // exactly above as "Gaps: N min" and "Free days: N (...)", so as
               // chips they only repeat the numbers in a noisier form.
-              const penalties = ((r.breakdown?.penalties ?? []) as { type: string; day?: string; cutoff?: string; minutes?: number }[])
+              const penalties = ((r.breakdown?.penalties ?? []) as Penalty[])
                 .filter((p) => p.type !== "gaps_minutes");
-              const bonuses = ((r.breakdown?.bonuses ?? []) as { type: string; value?: number }[])
+              const bonuses = ((r.breakdown?.bonuses ?? []) as Bonus[])
                 .filter((b) => b.type !== "free_days");
 
               return (
@@ -1050,15 +1058,15 @@ export default function Home() {
               {/* Same two omissions as the cards above: the gaps penalty and
                   the free-days bonus are already stated per option, so
                   repeating them here adds nothing. */}
-              {(active?.breakdown?.penalties as { type: string }[] | undefined)
+              {(active?.breakdown?.penalties as Penalty[] | undefined)
                 ?.filter((p) => p.type !== "gaps_minutes")
                 .map((p, idx: number) => (
-                  <span key={idx} style={{ marginRight: 8 }}>❌ {p.type}</span>
+                  <span key={idx} style={{ marginRight: 8 }}>❌ {penaltyLabel(p)}</span>
                 ))}
-              {(active?.breakdown?.bonuses as { type: string }[] | undefined)
+              {(active?.breakdown?.bonuses as Bonus[] | undefined)
                 ?.filter((b) => b.type !== "free_days")
                 .map((b, idx: number) => (
-                  <span key={idx} style={{ marginRight: 8 }}>✅ {b.type}</span>
+                  <span key={idx} style={{ marginRight: 8 }}>✅ {bonusLabel(b)}</span>
                 ))}
             </div>
           </div>
