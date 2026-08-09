@@ -6,9 +6,17 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { optimizeRanked, Prefs, SectionLock } from "@/lib/api";
 import { TimetableGrid, CompareTimetableGrid } from "../components/TimetableGrid";
 import { CoursePicker } from "../components/CoursePicker";
-import { InfoIconButton, InfoModal } from "../components/InfoModal";
 import { toast } from "sonner";
 import { ThemeToggle } from "@/components/theme-toggle";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Info } from "lucide-react";
 
 
 const DAYS = ["Mo", "Tu", "We", "Th", "Fr"] as const;
@@ -228,8 +236,6 @@ export default function Home() {
   const [userId, setUserId] = useState<string | null>(null);
   const [term, setTerm] = useState<string>(DEFAULT_TERM);
   const [showHelp, setShowHelp] = useState(true);
-  const [openHardInfo, setOpenHardInfo] = useState(false);
-  const [openSoftInfo, setOpenSoftInfo] = useState(false);
 
   const [selectedCourses, setSelectedCourses] = useState<string[]>([]);
   const [instructorLocks, setInstructorLocks] = useState<Record<string, string>>({});
@@ -646,7 +652,28 @@ export default function Home() {
             <div style={{ border: "1px solid var(--border-subtle)", borderRadius: 10, padding: 12, background: "var(--surface-2)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, fontWeight: 700, marginBottom: 8 }}>
                 <span>Hard preferences</span>
-                <InfoIconButton onClick={() => setOpenHardInfo(true)} />
+                <Dialog>
+                  <DialogTrigger
+                    aria-label="About hard preferences"
+                    className="inline-flex size-5 items-center justify-center rounded-full border border-border text-xs font-bold text-muted-foreground hover:bg-muted"
+                  >
+                    <Info className="size-3" aria-hidden />
+                  </DialogTrigger>
+                  <DialogContent className="max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Hard preferences</DialogTitle>
+                      <DialogDescription>
+                        Hard preferences are non-negotiable constraints. If a timetable
+                        violates one, it is rejected.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <ul className="ml-4 list-disc text-sm text-foreground">
+                      <li>No classes before 10:30</li>
+                      <li>Keep Friday completely free</li>
+                      <li>Avoid clashes (required)</li>
+                    </ul>
+                  </DialogContent>
+                </Dialog>
               </div>
 
               {/* Hard Free Days (multi-select) */}
@@ -742,7 +769,28 @@ export default function Home() {
             <div style={{ border: "1px solid var(--border-subtle)", borderRadius: 10, padding: 12 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, fontWeight: 700, marginBottom: 8 }}>
                 <span>Soft preferences</span>
-                <InfoIconButton onClick={() => setOpenSoftInfo(true)} />
+                <Dialog>
+                  <DialogTrigger
+                    aria-label="About soft preferences"
+                    className="inline-flex size-5 items-center justify-center rounded-full border border-border text-xs font-bold text-muted-foreground hover:bg-muted"
+                  >
+                    <Info className="size-3" aria-hidden />
+                  </DialogTrigger>
+                  <DialogContent className="max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Soft preferences</DialogTitle>
+                      <DialogDescription>
+                        Soft preferences are nice-to-haves. The optimiser will try to
+                        satisfy them, but may trade them off to find a feasible timetable.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <ul className="ml-4 list-disc text-sm text-foreground">
+                      <li>Minimize gaps between classes</li>
+                      <li>Prefer compact schedules</li>
+                      <li>Prefer fewer days on campus</li>
+                    </ul>
+                  </DialogContent>
+                </Dialog>
               </div>
 
               {/* Soft Free Days (multi-select) */}
@@ -891,26 +939,6 @@ export default function Home() {
         </div>
       </div>
 
-      <InfoModal open={openHardInfo} title="Hard preferences" onClose={() => setOpenHardInfo(false)}>
-        <div>Hard preferences are <strong>non-negotiable constraints</strong>.</div>
-        <div>If a timetable violates a hard preference, it’s rejected.</div>
-        <div style={{ marginTop: 10, fontWeight: 600 }}>Examples:</div>
-        <ul style={{ margin: "6px 0 0 18px" }}>
-          <li>No classes before 10:30</li>
-          <li>Keep Friday completely free</li>
-          <li>Avoid clashes (required)</li>
-        </ul>
-      </InfoModal>
-      <InfoModal open={openSoftInfo} title="Soft preferences" onClose={() => setOpenSoftInfo(false)}>
-        <div>Soft preferences are <strong>nice-to-haves</strong>.</div>
-        <div>The optimizer will try to satisfy them, but may trade them off to find a feasible timetable.</div>
-        <div style={{ marginTop: 10, fontWeight: 600 }}>Examples:</div>
-        <ul style={{ margin: "6px 0 0 18px" }}>
-          <li>Minimize gaps between classes</li>
-          <li>Prefer compact schedules</li>
-          <li>Prefer fewer days on campus</li>
-        </ul>
-      </InfoModal>
       <div ref={resultsRef} id="results" style={{ scrollMarginTop: 90 }}>
         {result && (
           <div style={{ marginTop: 14, border: "1px solid var(--border)", borderRadius: 12, padding: 14 }}>
@@ -1211,105 +1239,40 @@ export default function Home() {
           </div>
         )}
       </div>
-      {showHelp && (
-        <>
-          <button
-            type="button"
-            aria-label="Close help"
-            onClick={() => setShowHelp(false)}
-            style={{
-              position: "fixed",
-              inset: 0,
-              border: "none",
-              background: "var(--overlay)",
-              padding: 0,
-              margin: 0,
-              zIndex: 40,
-            }}
-          />
-          <dialog
-            open
-            aria-label="How to use HKUST Timetable Optimizer"
-            style={{
-              border: "none",
-              padding: 0,
-              background: "transparent",
-              position: "fixed",
-              inset: 0,
-              width: "100%",
-              height: "100%",
-              margin: 0,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              zIndex: 50,
-            }}
-          >
-            <div
-              style={{
-                background: "var(--surface)",
-                borderRadius: 14,
-                padding: 20,
-                width: "100%",
-                maxWidth: 760,
-                maxHeight: "85vh",
-                overflowY: "auto",
-                boxShadow: "var(--shadow-lg)",
-              }}
-            >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-              <div style={{ fontSize: 18, fontWeight: 800 }}>How to use</div>
-              <button
-                type="button"
-                onClick={() => setShowHelp(false)}
-                aria-label="Close"
-                style={{
-                  border: "none",
-                  background: "transparent",
-                  fontSize: 20,
-                  cursor: "pointer",
-                  color: "var(--text-muted)",
-                }}
-              >
-                ×
-              </button>
-            </div>
-            <div style={{ marginTop: 12, fontSize: 14, color: "var(--text-body)", lineHeight: 1.5 }}>
-              <div style={{ fontWeight: 700 }}>1) Choose a term</div>
-              <div style={{ marginBottom: 10 }}>
-                Pick “2026 Fall”, “2026 Summer” or “2026 Spring”. The label is just for clarity, but it loads the right term data behind the scenes.
-              </div>
-
-              <div style={{ fontWeight: 700 }}>2) Add courses</div>
-              <div style={{ marginBottom: 10 }}>
-                Use the search box to find a course by code or title, then click “Add”. Selected courses show as chips you can remove.
-              </div>
-
-              <div style={{ fontWeight: 700 }}>3) Set preferences</div>
-              <div style={{ marginBottom: 10 }}>
-                <div><b>Hard</b> preferences are strict rules (e.g. “Must be free on Tue”). Any schedule that violates them is rejected.</div>
-                <div><b>Soft</b> preferences are scored (e.g. “No classes after 5pm”). The optimizer tries to minimize these penalties.</div>
-              </div>
-
-              <div style={{ fontWeight: 700 }}>4) Optimize</div>
-              <div style={{ marginBottom: 10 }}>
-                Click “Optimize” to generate the best schedules. Each option shows a score and key tradeoffs. (it may take up to a minute to load the results)
-              </div>
-
-              <div style={{ fontWeight: 700 }}>5) Compare results</div>
-              <div style={{ marginBottom: 10 }}>
-                Pin options you like, then select two to overlay and compare. This helps you choose between close tradeoffs.
-              </div>
-
-              <div style={{ fontWeight: 700 }}>6) P.S.</div>
-              <div style={{ marginBottom: 10 }}>
-                This is a work in progress. Please report any issues or feedback to google form on the top right. Use the theme switch in the header to follow your system setting or force light or dark.
-              </div>
-            </div>
+      <Dialog open={showHelp} onOpenChange={setShowHelp}>
+        <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>How to use</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 text-sm text-foreground">
+            <section>
+              <h3 className="font-bold">1) Choose a term</h3>
+              <p>Pick “2026 Fall”, “2026 Summer” or “2026 Spring”. The label is just for clarity, but it loads the right term data behind the scenes.</p>
+            </section>
+            <section>
+              <h3 className="font-bold">2) Add courses</h3>
+              <p>Use the search box to find a course by code or title, then click “Add”. Selected courses show as chips you can remove.</p>
+            </section>
+            <section>
+              <h3 className="font-bold">3) Set preferences</h3>
+              <p><b>Hard</b> preferences are strict rules (e.g. “Must be free on Tue”). Any schedule that violates them is rejected.</p>
+              <p><b>Soft</b> preferences are scored (e.g. “No classes after 5pm”). The optimizer tries to minimize these penalties.</p>
+            </section>
+            <section>
+              <h3 className="font-bold">4) Optimize</h3>
+              <p>Click “Optimize” to generate the best schedules. Each option shows a score and key tradeoffs. (it may take up to a minute to load the results)</p>
+            </section>
+            <section>
+              <h3 className="font-bold">5) Compare results</h3>
+              <p>Pin options you like, then select two to overlay and compare. This helps you choose between close tradeoffs.</p>
+            </section>
+            <section>
+              <h3 className="font-bold">6) P.S.</h3>
+              <p>This is a work in progress. Please report any issues or feedback to google form on the top right. Use the theme switch in the header to follow your system setting or force light or dark.</p>
+            </section>
           </div>
-          </dialog>
-        </>
-      )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
