@@ -61,12 +61,23 @@ Verified: shadcn/ui supports **Tailwind v4 and React 19**, this project's
 stack, and uses CSS-first `@theme inline` configuration rather than a
 `tailwind.config.js`. `init` correctly detects Next.js and Tailwind v4 here.
 
-**`init` appends; it does not replace.** Run against this app it leaves the
-existing tokens and the existing `@media (prefers-color-scheme: dark)` block
-in place while adding `@custom-variant dark (&:is(.dark *))` and a `.dark {}`
-block, taking `globals.css` from 208 to 372 lines with two competing theme
-mechanisms live simultaneously. Reconciling them is the substance of stage 1,
-not the `init` command.
+**`init` appends new tokens, and overwrites existing ones that share a name.**
+Confirmed by running it: it left every token name intact (nothing was dropped)
+but rewrote the values of the names shadcn also uses, and added
+`@custom-variant dark (&:is(.dark *))` plus a `.dark {}` block alongside the
+existing `@media (prefers-color-scheme: dark)`, taking `globals.css` from 219
+to 372 lines with two theme mechanisms live at once.
+
+The overwrites are not cosmetic. In this app they replaced `--accent`
+(`#003366`, the HKUST navy every primary button uses) with shadcn's pale grey
+hover surface, replaced `--border`, decoupled `--background`/`--foreground`
+from their aliases, and turned a working `--font-sans: var(--font-geist-sans)`
+into a circular `var(--font-sans)`.
+
+The practical consequence for every stage: **treat any `shadcn` CLI run as
+destructive to same-named tokens.** Run it as its own commit so the damage is
+visible in one diff, and re-check the token block afterwards. Reconciling this
+is the substance of stage 1, not the `init` command.
 
 It does **not** modify `layout.tsx`. Its "Updating fonts" step only writes
 `--font-sans: var(--font-sans)` into `@theme`, and this app defines
