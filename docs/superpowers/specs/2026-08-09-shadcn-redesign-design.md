@@ -11,7 +11,7 @@ variables. Measured against the current tree:
 | Tailwind classNames in app code | **0** |
 | Tailwind CSS | installed and wired through PostCSS, **entirely unused** |
 | `web/app/(app)/page.tsx` | 1,322 lines, 134 of those style blocks |
-| Component library, Radix, CVA | none |
+| Component library, primitives, CVA | none |
 
 The consequences are concrete rather than aesthetic:
 
@@ -38,14 +38,40 @@ CLI copies component *source* into the repository (`components/ui/button.tsx`)
 and the project owns it thereafter. It is a code generator plus a design
 system.
 
-Adoption introduces real dependencies the project does not have: Radix UI
-primitives (per component), `class-variance-authority`, `clsx`,
-`tailwind-merge`, `lucide-react` for icons, and `next-themes` for theming. It
-also adds `components.json` and `lib/utils.ts` containing the `cn()` helper.
+Adoption introduces real dependencies the project does not have. Verified by
+running `shadcn init` against a throwaway copy of this app rather than taken
+from the docs, because the CLI has changed:
 
-Verified against the current docs: shadcn/ui supports **Tailwind v4 and React
-19**, which is this project's stack, and uses CSS-first `@theme inline`
-configuration rather than a `tailwind.config.js`.
+- **`@base-ui/react`** — the primitive library. The current default style is
+  `base-nova`, and generated components import from `@base-ui/react/*`.
+  **Not Radix.** An earlier draft of this spec said Radix; that was wrong.
+  Radix is still selectable via `--base radix`, but the default is Base UI and
+  this project takes the default.
+- `class-variance-authority`, `clsx`, `tailwind-merge` — variant and class
+  merging, used by every generated component
+- `lucide-react` — icons
+- `tw-animate-css` — animation utilities the components reference
+- `shadcn` itself, as a runtime dependency, because the generated
+  `globals.css` does `@import "shadcn/tailwind.css"`
+- `next-themes` — not installed by the CLI; added by this stage for theming
+
+It also writes `components.json` and `lib/utils.ts` containing `cn()`.
+
+Verified: shadcn/ui supports **Tailwind v4 and React 19**, this project's
+stack, and uses CSS-first `@theme inline` configuration rather than a
+`tailwind.config.js`. `init` correctly detects Next.js and Tailwind v4 here.
+
+**`init` appends; it does not replace.** Run against this app it leaves the
+existing tokens and the existing `@media (prefers-color-scheme: dark)` block
+in place while adding `@custom-variant dark (&:is(.dark *))` and a `.dark {}`
+block, taking `globals.css` from 208 to 372 lines with two competing theme
+mechanisms live simultaneously. Reconciling them is the substance of stage 1,
+not the `init` command.
+
+It does **not** modify `layout.tsx`. Its "Updating fonts" step only writes
+`--font-sans: var(--font-sans)` into `@theme`, and this app defines
+`--font-geist-sans`, so the sans font silently falls back until that is
+mapped.
 
 ## Goal
 
@@ -114,7 +140,15 @@ Three groups have no shadcn equivalent and are kept as app-specific tokens:
 `--accent` roles rather than surviving as separate names.
 
 Colours move to OKLCH, which is what the shadcn CLI writes and what Tailwind v4
-expects.
+expects. The brand values convert to:
+
+| Role | Hex | OKLCH |
+|---|---|---|
+| `--primary` light | `#003366` | `oklch(0.3233 0.1025 253.89)` |
+| `--primary` dark | `#2f6fb0` | `oklch(0.5324 0.1214 251.48)` |
+
+The CLI's default `baseColor` is `neutral`, which is chroma-0 grey. This
+project sets `slate` instead, per decision 3.
 
 ## Stages
 
@@ -139,7 +173,7 @@ invisible plumbing, and both themes need checking before merge.
 Replace hand-rolled and native controls with shadcn components: Button, Select,
 Card, Dialog, Input, Checkbox, Badge, Label, Sonner, Tooltip, Separator.
 
-This is where the quality arrives. Radix provides keyboard navigation, focus
+This is where the quality arrives. Base UI provides keyboard navigation, focus
 management and screen-reader semantics that inline styles cannot. It matters
 most for the professor and section pickers, which are currently native selects
 holding long option lists.
