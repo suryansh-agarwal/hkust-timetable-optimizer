@@ -7,7 +7,7 @@ import { optimizeRanked, Prefs, SectionLock } from "@/lib/api";
 import { TimetableGrid, CompareTimetableGrid } from "../components/TimetableGrid";
 import { CoursePicker } from "../components/CoursePicker";
 import { InfoIconButton, InfoModal } from "../components/InfoModal";
-import { Toast } from "../components/Toast";
+import { toast } from "sonner";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 
@@ -378,9 +378,7 @@ export default function Home() {
   const [activeIdx, setActiveIdx] = useState(0);
   const [error, setError] = useState<string>("");
   const [didJustOptimize, setDidJustOptimize] = useState(false);
-  const [toastOpen, setToastOpen] = useState(false);
   const resultsRef = useRef<HTMLDivElement | null>(null);
-  const toastMessage = "Timetable not possible with current subjects";
 
   // ---- Pin + Compare state ----
   const [pinned, setPinned] = useState<Pinned[]>([]);
@@ -430,7 +428,6 @@ export default function Home() {
     setResult(null);
     setActiveIdx(0);
     setDidJustOptimize(false);
-    setToastOpen(false);
 
     // Validate time constraints before running
     const conflicts = validateTimeConstraints(hardNoBefore, hardNoAfter, softNoBefore, softNoAfter, DAYS);
@@ -504,7 +501,7 @@ export default function Home() {
       setResult(data);
       const resultCount = data?.results?.length ?? 0;
       if (resultCount === 0) {
-        setToastOpen(true);
+        toast.error("Timetable not possible with current subjects");
       } else {
         setDidJustOptimize(true);
       }
@@ -529,12 +526,6 @@ export default function Home() {
   
   return (
     <div style={{ maxWidth: 1200, margin: "0 auto", padding: "20px 24px", fontFamily: "system-ui", width: "100%" }}>
-      <Toast
-        open={toastOpen}
-        variant="error"
-        message={toastMessage}
-        onClose={() => setToastOpen(false)}
-      />
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <div>
           <h1 style={{ fontSize: 28, fontWeight: 700, margin: 0 }}>HKUST Timetable Optimizer</h1>
