@@ -495,7 +495,7 @@ export function CoursePicker(props: Readonly<{
                 </div>
               </div>
               <Button
-                variant={on ? "secondary" : "outline"}
+                variant={on ? "default" : "outline"}
                 size="sm"
                 onClick={() => (on ? remove(c.course_code) : add(c.course_code))}
                 disabled={on}

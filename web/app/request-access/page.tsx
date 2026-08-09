@@ -97,7 +97,7 @@ function RequestAccessContent() {
           </div>
           <Button
             type="button"
-            variant="outline"
+            variant="default"
             onClick={copyEmail}
             disabled={!email}
           >

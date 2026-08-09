@@ -17,7 +17,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Info, MessageSquare, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 
 
 const DAYS = ["Mo", "Tu", "We", "Th", "Fr"] as const;
@@ -543,21 +543,16 @@ export default function Home() {
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <ThemeToggle />
-          <Button
-            variant="outline"
-            size="sm"
-            render={
-              <a
-                href="https://docs.google.com/forms/d/e/1FAIpQLSdUPWeLVqBYbBbZunz-tPnI3mvgGDgKN2onmYPKlZ13OcwNUA/viewform?usp=publish-editor"
-                target="_blank"
-                rel="noreferrer"
-                aria-label="Leave feedback"
-              />
-            }
+          <a
+            href="https://docs.google.com/forms/d/e/1FAIpQLSdUPWeLVqBYbBbZunz-tPnI3mvgGDgKN2onmYPKlZ13OcwNUA/viewform?usp=publish-editor"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="Leave feedback"
+            className={buttonVariants({ variant: "outline", size: "sm" })}
           >
             <MessageSquare className="size-4" aria-hidden />
             Feedback
-          </Button>
+          </a>
           <Button variant="outline" size="sm" onClick={() => setShowHelp(true)}>
             How to use?
           </Button>
@@ -949,7 +944,7 @@ export default function Home() {
                     <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                       <div style={{ fontWeight: 900, fontSize: 16 }}>Score {r.score.toFixed(1)}</div>
                       <Button
-                        variant={isPinned ? "secondary" : "outline"}
+                        variant={isPinned ? "default" : "outline"}
                         size="sm"
                         onClick={(e) => {
                           e.stopPropagation();
