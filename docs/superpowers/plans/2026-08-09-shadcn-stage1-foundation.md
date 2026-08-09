@@ -392,9 +392,14 @@ Every `var(--x)` used in a component must resolve. This finds any that do not:
 
 ```bash
 cd web && comm -23 \
-  <(grep -rho "var(--[a-z0-9-]*)" app --include="*.tsx" | sed 's/var(--\(.*\))/\1/' | sort -u) \
-  <(grep -oE "^\s*--[a-z0-9-]+:" app/globals.css | tr -d ' :' | sort -u)
+  <(grep -rhoE "var\(--[a-z0-9-]+" app components --include="*.tsx" | sed 's/var(//' | sort -u) \
+  <(grep -oE "^[[:space:]]*--[a-z0-9-]+[[:space:]]*:" app/globals.css | sed 's/[[:space:]]//g; s/:$//' | sort -u)
 ```
+
+Both sides must keep the leading `--`. An earlier version of this command
+stripped the dashes from the usage side but not the definition side, so the
+lists could never intersect and it reported every token as undefined — a check
+that fails open is worse than no check.
 
 Expected: **no output.** Any line printed is a token a component uses that the stylesheet does not define, which renders as an invalid value.
 
@@ -708,9 +713,14 @@ Expected: 74 Python tests, 17 vitest tests, tsc clean, eslint clean, build clean
 
 ```bash
 cd web && comm -23 \
-  <(grep -rho "var(--[a-z0-9-]*)" app components --include="*.tsx" | sed 's/var(--\(.*\))/\1/' | sort -u) \
-  <(grep -oE "^\s*--[a-z0-9-]+:" app/globals.css | tr -d ' :' | sort -u)
+  <(grep -rhoE "var\(--[a-z0-9-]+" app components --include="*.tsx" | sed 's/var(//' | sort -u) \
+  <(grep -oE "^[[:space:]]*--[a-z0-9-]+[[:space:]]*:" app/globals.css | sed 's/[[:space:]]//g; s/:$//' | sort -u)
 ```
+
+Both sides must keep the leading `--`. An earlier version of this command
+stripped the dashes from the usage side but not the definition side, so the
+lists could never intersect and it reported every token as undefined — a check
+that fails open is worse than no check.
 
 Expected: no output.
 
