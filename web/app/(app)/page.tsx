@@ -8,6 +8,7 @@ import { TimetableGrid, CompareTimetableGrid } from "../components/TimetableGrid
 import { CoursePicker } from "../components/CoursePicker";
 import { InfoIconButton, InfoModal } from "../components/InfoModal";
 import { Toast } from "../components/Toast";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 
 const DAYS = ["Mo", "Tu", "We", "Th", "Fr"] as const;
@@ -543,6 +544,7 @@ export default function Home() {
           <div><b>Logged in as:</b> {email}</div>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <ThemeToggle />
           <a
             href="https://docs.google.com/forms/d/e/1FAIpQLSdUPWeLVqBYbBbZunz-tPnI3mvgGDgKN2onmYPKlZ13OcwNUA/viewform?usp=publish-editor"
             target="_blank"
@@ -1310,7 +1312,7 @@ export default function Home() {
 
               <div style={{ fontWeight: 700 }}>6) P.S.</div>
               <div style={{ marginBottom: 10 }}>
-                This is a work in progress. Please report any issues or feedback to google form on the top right. The app follows your system light or dark theme.
+                This is a work in progress. Please report any issues or feedback to google form on the top right. Use the theme switch in the header to follow your system setting or force light or dark.
               </div>
             </div>
           </div>
