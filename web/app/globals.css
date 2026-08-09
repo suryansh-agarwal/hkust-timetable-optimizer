@@ -31,7 +31,6 @@
   /* HKUST navy #003366 */
   --primary: oklch(0.3233 0.1025 253.89);
   --primary-foreground: oklch(0.9838 0.0035 247.86);
-  --primary-hover: oklch(0.3900 0.1025 253.89);
 
   --secondary: oklch(0.9684 0.0068 247.90);
   --secondary-foreground: oklch(0.2079 0.0399 265.73);
@@ -120,7 +119,6 @@
   /* Lightened navy. #003366 is unreadable on a dark surface. */
   --primary: oklch(0.5324 0.1214 251.48);
   --primary-foreground: oklch(0.9838 0.0035 247.86);
-  --primary-hover: oklch(0.6000 0.1214 251.48);
 
   --secondary: oklch(0.2800 0.0369 259.97);
   --secondary-foreground: oklch(0.9838 0.0035 247.86);

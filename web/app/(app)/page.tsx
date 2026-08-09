@@ -16,7 +16,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Info } from "lucide-react";
+import { Info, MessageSquare, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 
 const DAYS = ["Mo", "Tu", "We", "Th", "Fr"] as const;
@@ -542,73 +543,31 @@ export default function Home() {
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <ThemeToggle />
-          <a
-            href="https://docs.google.com/forms/d/e/1FAIpQLSdUPWeLVqBYbBbZunz-tPnI3mvgGDgKN2onmYPKlZ13OcwNUA/viewform?usp=publish-editor"
-            target="_blank"
-            rel="noreferrer"
-            style={{
-              border: "1px solid var(--border)",
-              background: "var(--surface)",
-              borderRadius: 10,
-              padding: "8px 12px",
-              fontSize: 13,
-              fontWeight: 700,
-              cursor: "pointer",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 8,
-              color: "inherit",
-              textDecoration: "none",
-            }}
-            aria-label="Leave feedback"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden>
-              <path
-                fill="currentColor"
-                d="M5 4h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9l-4 3v-3H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm0 2v9h2v1.5L9 15h10V6H5Z"
+          <Button
+            variant="outline"
+            size="sm"
+            render={
+              <a
+                href="https://docs.google.com/forms/d/e/1FAIpQLSdUPWeLVqBYbBbZunz-tPnI3mvgGDgKN2onmYPKlZ13OcwNUA/viewform?usp=publish-editor"
+                target="_blank"
+                rel="noreferrer"
+                aria-label="Leave feedback"
               />
-            </svg>
-            Feedback
-          </a>
-          <button
-            type="button"
-            onClick={() => setShowHelp(true)}
-            style={{
-              border: "1px solid var(--border)",
-              background: "var(--surface)",
-              borderRadius: 10,
-              padding: "8px 12px",
-              fontSize: 13,
-              fontWeight: 700,
-              cursor: "pointer",
-            }}
+            }
           >
+            <MessageSquare className="size-4" aria-hidden />
+            Feedback
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setShowHelp(true)}>
             How to use?
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            size="sm"
             onClick={runOptimize}
             disabled={loading || selectedCourses.length === 0}
-            style={{
-              border: "none",
-              background: "var(--primary)",
-              color: "var(--primary-foreground)",
-              borderRadius: 10,
-              padding: "8px 12px",
-              fontSize: 13,
-              fontWeight: 700,
-              cursor: loading || selectedCourses.length === 0 ? "not-allowed" : "pointer",
-              opacity: loading || selectedCourses.length === 0 ? 0.6 : 1,
-            }}
-            onMouseEnter={(e) => {
-              if (!loading && selectedCourses.length > 0) e.currentTarget.style.background = "var(--primary-hover)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "var(--primary)";
-            }}
           >
             {loading ? "Optimizing..." : "Optimize"}
-          </button>
+          </Button>
         </div>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
@@ -989,26 +948,17 @@ export default function Home() {
                     <div style={{ fontWeight: 800, fontSize: 14 }}>Option #{i + 1}</div>
                     <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                       <div style={{ fontWeight: 900, fontSize: 16 }}>Score {r.score.toFixed(1)}</div>
-                      <button
-                        type="button"
+                      <Button
+                        variant={isPinned ? "secondary" : "outline"}
+                        size="sm"
                         onClick={(e) => {
                           e.stopPropagation();
                           pinResultOption(r, i);
                         }}
-                        style={{
-                          border: isPinned ? "1px solid var(--pin-border)" : "1px solid var(--border)",
-                          background: isPinned ? "var(--pin-bg)" : "var(--surface-2)",
-                          borderRadius: 8,
-                          padding: "4px 8px",
-                          fontSize: 11,
-                          fontWeight: 700,
-                          cursor: "pointer",
-                          color: isPinned ? "var(--pin-text)" : "var(--text-strong)",
-                        }}
                         title={isPinned ? "Pinned" : "Pin this option for comparison"}
                       >
                         {isPinned ? "✅ Pinned" : "📌 Pin"}
-                      </button>
+                      </Button>
                     </div>
                   </div>
 
@@ -1139,22 +1089,15 @@ export default function Home() {
                       }}
                     />
                     <span style={{ fontSize: 12, color: "var(--text-subtle)" }}>{p.score.toFixed(1)}</span>
-                    <button
-                      type="button"
+                    <Button
+                      variant="ghost"
+                      size="icon"
                       onClick={() => unpin(p.id)}
-                      style={{
-                        border: "none",
-                        background: "transparent",
-                        cursor: "pointer",
-                        fontSize: 14,
-                        color: "var(--text-faint)",
-                        padding: 0,
-                        lineHeight: 1,
-                      }}
                       title="Unpin"
+                      aria-label="Unpin"
                     >
-                      ×
-                    </button>
+                      <X className="size-4" aria-hidden />
+                    </Button>
                   </div>
                 ))}
               </div>

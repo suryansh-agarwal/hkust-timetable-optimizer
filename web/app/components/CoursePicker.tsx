@@ -4,6 +4,8 @@ import { useEffect, useRef, useState, useMemo, type ReactNode } from "react";
 import { loadCourseIndex, searchCourseIndex, getIndexCacheStatus, getCourseFromIndex, fetchCourseSections, CourseIndexEntry } from "@/lib/api";
 import type { CourseSections, SectionLock } from "@/lib/api";
 import { optionsFor, reconcilePins, matchingAppliesTo } from "@/lib/sectionOptions";
+import { Button } from "@/components/ui/button";
+import { X } from "lucide-react";
 
 function samePins(a: SectionLock, b: SectionLock) {
   return a.lecture === b.lecture && a.tutorial === b.tutorial && a.lab === b.lab;
@@ -265,21 +267,15 @@ export function CoursePicker(props: Readonly<{
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "space-between" }}>
                   <span style={{ fontWeight: 600 }}>{code}</span>
-                  <button
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     onClick={() => remove(code)}
-                    style={{
-                      border: "none",
-                      background: "transparent",
-                      cursor: "pointer",
-                      fontSize: 16,
-                      lineHeight: "16px",
-                      color: "var(--text-muted)",
-                    }}
                     aria-label={`Remove ${code}`}
                     title="Remove"
                   >
-                    ×
-                  </button>
+                    <X className="size-4" aria-hidden />
+                  </Button>
                 </div>
 
                 {(() => {
@@ -498,21 +494,15 @@ export function CoursePicker(props: Readonly<{
                   {c.subject ? `${c.subject} • ` : ""}{c.units ?? "-"} units
                 </div>
               </div>
-              <button
+              <Button
+                variant={on ? "secondary" : "outline"}
+                size="sm"
                 onClick={() => (on ? remove(c.course_code) : add(c.course_code))}
                 disabled={on}
-                style={{
-                  padding: "6px 10px",
-                  borderRadius: 10,
-                  border: "1px solid var(--border)",
-                  background: on ? "var(--selected-bg)" : "var(--surface)",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  flexShrink: 0,
-                }}
+                className="shrink-0"
               >
                 {on ? "Added" : "+ Add"}
-              </button>
+              </Button>
             </div>
           );
         })}

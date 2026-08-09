@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { Monitor, Moon, Sun } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 const OPTIONS = [
   { value: "system", label: "System", Icon: Monitor },
@@ -24,39 +25,24 @@ export function ThemeToggle() {
     <div
       role="group"
       aria-label="Colour theme"
-      style={{
-        display: "inline-flex",
-        border: "1px solid var(--border)",
-        borderRadius: 10,
-        overflow: "hidden",
-        background: "var(--card)",
-      }}
+      className="inline-flex overflow-hidden rounded-lg border border-border bg-card"
     >
       {OPTIONS.map(({ value, label, Icon }) => {
         const active = mounted && theme === value;
         return (
-          <button
+          <Button
             key={value}
             type="button"
+            variant={active ? "default" : "ghost"}
+            size="sm"
             onClick={() => setTheme(value)}
             aria-pressed={active}
             title={label}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "8px 10px",
-              border: "none",
-              cursor: "pointer",
-              fontSize: 13,
-              fontWeight: 600,
-              background: active ? "var(--primary)" : "transparent",
-              color: active ? "var(--primary-foreground)" : "var(--muted-foreground)",
-            }}
+            className="rounded-none"
           >
-            <Icon size={14} aria-hidden />
+            <Icon className="size-3.5" aria-hidden />
             {label}
-          </button>
+          </Button>
         );
       })}
     </div>
