@@ -95,6 +95,9 @@
   --success-bg: color-mix(in oklch, var(--success) 10%, var(--background));
   --success-border: color-mix(in oklch, var(--success) 30%, var(--background));
   --pin-bg: color-mix(in oklch, var(--primary) 12%, var(--background));
+  /* Defined per theme rather than aliased to --primary: in dark mode the
+     lightened navy against --pin-bg measures 3.58:1, below the 4.5:1 AA
+     threshold for text. */
   --pin-border: var(--primary);
   --pin-text: var(--primary);
   --selected-bg: color-mix(in oklch, var(--primary) 8%, var(--background));
@@ -148,6 +151,9 @@
   --sub-8: 38 92% 62%;
   --cmp-a: 0 90% 70%;
   --cmp-b: 217 91% 70%;
+
+  --pin-border: oklch(0.7800 0.1000 251.48);
+  --pin-text: oklch(0.7800 0.1000 251.48);
 }
 
 @theme inline {
