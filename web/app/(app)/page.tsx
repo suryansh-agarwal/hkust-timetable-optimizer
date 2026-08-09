@@ -592,8 +592,8 @@ export default function Home() {
             disabled={loading || selectedCourses.length === 0}
             style={{
               border: "none",
-              background: "var(--accent)",
-              color: "var(--accent-fg)",
+              background: "var(--primary)",
+              color: "var(--primary-foreground)",
               borderRadius: 10,
               padding: "8px 12px",
               fontSize: 13,
@@ -602,10 +602,10 @@ export default function Home() {
               opacity: loading || selectedCourses.length === 0 ? 0.6 : 1,
             }}
             onMouseEnter={(e) => {
-              if (!loading && selectedCourses.length > 0) e.currentTarget.style.background = "var(--accent-hover)";
+              if (!loading && selectedCourses.length > 0) e.currentTarget.style.background = "var(--primary-hover)";
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = "var(--accent)";
+              e.currentTarget.style.background = "var(--primary)";
             }}
           >
             {loading ? "Optimizing..." : "Optimize"}
