@@ -1,69 +1,66 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/* shadcn's class-based dark mode. next-themes puts .dark on <html>. */
+@custom-variant dark (&:is(.dark *));
 
 /*
  * Theme tokens.
  *
- * The UI is built with inline styles, so every colour has to come from a
- * variable here for dark mode to reach it. Add a token rather than a literal
- * hex value in a component.
+ * Two groups live here. The shadcn set (--background, --card, --primary and
+ * friends) is what generated components consume. The legacy set (--surface,
+ * --text-muted and friends) is what this app's 237 inline styles consume; it
+ * is defined purely as aliases onto the shadcn set, and each alias is deleted
+ * as its consumers migrate in later stages.
  *
- * Dark mode is tinted toward HKUST navy (#003366) instead of neutral black so
- * the accent still reads as part of the same product.
+ * Base palette is shadcn "slate", chosen over neutral because the primary is
+ * HKUST navy and a chroma-0 grey sits badly against it.
  */
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
+  --radius: 0.625rem;
 
-  --bg: #ffffff;
-  --surface: #ffffff;
-  --surface-2: #fafafa;
-  --surface-3: #f7f7f7;
+  --background: oklch(1.0000 0.0000 89.88);
+  --foreground: oklch(0.1371 0.0360 258.53);
+  --card: oklch(1.0000 0.0000 89.88);
+  --card-foreground: oklch(0.1371 0.0360 258.53);
+  --popover: oklch(1.0000 0.0000 89.88);
+  --popover-foreground: oklch(0.1371 0.0360 258.53);
 
-  --border: #dddddd;
-  --border-subtle: #eeeeee;
-  --border-faint: #f1f1f1;
+  /* HKUST navy #003366 */
+  --primary: oklch(0.3233 0.1025 253.89);
+  --primary-foreground: oklch(0.9838 0.0035 247.86);
+  --primary-hover: oklch(0.3900 0.1025 253.89);
 
-  --text: #171717;
-  --text-strong: #111111;
-  --text-body: #444444;
-  --text-muted: #666666;
-  --text-subtle: #888888;
-  --text-faint: #999999;
+  --secondary: oklch(0.9684 0.0068 247.90);
+  --secondary-foreground: oklch(0.2079 0.0399 265.73);
+  --muted: oklch(0.9684 0.0068 247.90);
+  --muted-foreground: oklch(0.52 0.0407 257.44);
+  --accent: oklch(0.9684 0.0068 247.90);
+  --accent-foreground: oklch(0.2079 0.0399 265.73);
+  --destructive: oklch(0.6368 0.2078 25.33);
+  --destructive-foreground: oklch(0.9838 0.0035 247.86);
+  --border: oklch(0.9290 0.0126 255.53);
+  --input: oklch(0.9290 0.0126 255.53);
+  --ring: oklch(0.3233 0.1025 253.89);
 
-  --accent: #003366;
-  --accent-hover: #0a3a66;
-  --accent-fg: #ffffff;
+  --success: oklch(0.5500 0.1400 150.00);
+  --warn-bg: oklch(0.9500 0.0700 90.00);
+  --warn-text: oklch(0.4500 0.1000 70.00);
 
-  --danger: #b91c1c;
-  --danger-bg: #fff5f5;
-  --danger-border: #ffd6d6;
-  --danger-chip-bg: #fff1f1;
+  --overlay: oklch(0 0 0 / 0.35);
+  --shadow-sm: 0 1px 3px oklch(0 0 0 / 0.08);
+  --shadow-md: 0 2px 10px oklch(0 0 0 / 0.08);
+  --shadow-lg: 0 12px 30px oklch(0 0 0 / 0.20);
 
-  --success: #16a34a;
-  --success-bg: #f1fff3;
-  --success-border: #c9f3d0;
-
-  --warn-bg: #fef3c7;
-  --warn-text: #92400e;
-
-  --pin-bg: #e0ecff;
-  --pin-border: #1d4ed8;
-  --pin-text: #1d4ed8;
-
-  --selected-bg: #eef7ff;
-  --active-border: #111111;
-
-  --overlay: rgba(0, 0, 0, 0.35);
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
-  --shadow-md: 0 2px 10px rgba(0, 0, 0, 0.08);
-  --shadow-lg: 0 12px 30px rgba(0, 0, 0, 0.2);
-
-  /* Login page canvas */
-  --login-canvas: linear-gradient(135deg, #f7f9fc 0%, #eef2f8 100%);
-  --login-badge: #0f172a;
+  --login-canvas: linear-gradient(135deg, oklch(0.9800 0.0040 250) 0%, oklch(0.9550 0.0090 255) 100%);
+  --login-badge: oklch(0.2079 0.0399 265.73);
 
   /*
-   * One hue per subject. Fill, border and label are all derived from these in
-   * TimetableGrid, so dark mode only needs to lighten the hue.
+   * Subject hues stay as HSL triplets. TimetableGrid derives fill, border and
+   * label with hsl(var(--sub-N) / alpha); converting them to OKLCH means
+   * changing that component, which is stage 4.
    */
   --sub-1: 217 91% 45%;
   --sub-2: 160 84% 30%;
@@ -73,138 +70,176 @@
   --sub-6: 192 82% 32%;
   --sub-7: 239 84% 55%;
   --sub-8: 38 92% 38%;
-
-  /* Compare view: two fixed sides rather than per-subject hues */
   --cmp-a: 0 84% 55%;
   --cmp-b: 217 91% 55%;
 
-  /* Kept for the Tailwind bridge below */
-  --background: var(--bg);
-  --foreground: var(--text);
+  /* --- Legacy aliases. Deleted per-file as later stages migrate. --- */
+  --bg: var(--background);
+  --surface: var(--card);
+  --surface-2: var(--muted);
+  --surface-3: var(--muted);
+  --border-subtle: var(--border);
+  --border-faint: var(--border);
+  --text: var(--foreground);
+  --text-strong: var(--foreground);
+  --text-body: var(--foreground);
+  --text-muted: var(--muted-foreground);
+  --text-subtle: var(--muted-foreground);
+  --text-faint: var(--muted-foreground);
+  /* Not aliased to --destructive: that is shadcn's fill red for button
+     backgrounds, and as text it measures 3.76:1 on white. This app uses
+     --danger for text. */
+  --danger: oklch(0.505 0.19 25.5);
+  /* Tinted, not flat --muted: these back the error and success panels, and
+     mapping them to plain grey would silently drain the colour out of every
+     failure state in the app. color-mix keeps them theme-aware. */
+  --danger-bg: color-mix(in oklch, var(--destructive) 10%, var(--background));
+  --danger-border: color-mix(in oklch, var(--destructive) 30%, var(--background));
+  --danger-chip-bg: color-mix(in oklch, var(--destructive) 8%, var(--background));
+  --success-bg: color-mix(in oklch, var(--success) 10%, var(--background));
+  --success-border: color-mix(in oklch, var(--success) 30%, var(--background));
+  --pin-bg: color-mix(in oklch, var(--primary) 12%, var(--background));
+  /* Defined per theme rather than aliased to --primary: in dark mode the
+     lightened navy against --pin-bg measures 3.58:1, below the 4.5:1 AA
+     threshold for text. */
+  --pin-border: var(--primary);
+  --pin-text: var(--primary);
+  --selected-bg: color-mix(in oklch, var(--primary) 8%, var(--background));
+  --active-border: var(--primary);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    /* Explicit, so native controls and scrollbars commit to the dark rendering. */
-    color-scheme: dark;
+.dark {
+  color-scheme: dark;
+  --background: oklch(0.1371 0.0360 258.53);
+  --foreground: oklch(0.9838 0.0035 247.86);
+  --card: oklch(0.2000 0.0350 259.00);
+  --card-foreground: oklch(0.9838 0.0035 247.86);
+  --popover: oklch(0.2000 0.0350 259.00);
+  --popover-foreground: oklch(0.9838 0.0035 247.86);
 
-    --bg: #0d131f;
-    --surface: #151d2b;
-    --surface-2: #1b2433;
-    --surface-3: #111826;
+  /* Lightened navy. #003366 is unreadable on a dark surface. */
+  --primary: oklch(0.5324 0.1214 251.48);
+  --primary-foreground: oklch(0.9838 0.0035 247.86);
+  --primary-hover: oklch(0.6000 0.1214 251.48);
 
-    --border: #2a3547;
-    --border-subtle: #222c3c;
-    --border-faint: #1c2534;
+  --secondary: oklch(0.2800 0.0369 259.97);
+  --secondary-foreground: oklch(0.9838 0.0035 247.86);
+  --muted: oklch(0.2800 0.0369 259.97);
+  --muted-foreground: oklch(0.7107 0.0351 256.79);
+  --accent: oklch(0.2800 0.0369 259.97);
+  --accent-foreground: oklch(0.9838 0.0035 247.86);
+  --destructive: oklch(0.6000 0.1900 25.50);
+  --destructive-foreground: oklch(0.9838 0.0035 247.86);
+  --border: oklch(0.2800 0.0369 259.97);
+  --input: oklch(0.2800 0.0369 259.97);
+  --ring: oklch(0.8688 0.0198 252.85);
 
-    --text: #e8edf5;
-    --text-strong: #f4f7fb;
-    --text-body: #c3cddd;
-    --text-muted: #9aa7bd;
-    --text-subtle: #7d8ba3;
-    --text-faint: #6b7889;
+  --success: oklch(0.7200 0.1600 150.00);
+  --warn-bg: oklch(0.3000 0.0600 80.00);
+  --warn-text: oklch(0.8500 0.1400 85.00);
 
-    --accent: #2f6fb0;
-    --accent-hover: #3d84cc;
-    --accent-fg: #ffffff;
+  --overlay: oklch(0 0 0 / 0.60);
+  --shadow-sm: 0 1px 3px oklch(0 0 0 / 0.50);
+  --shadow-md: 0 2px 12px oklch(0 0 0 / 0.55);
+  --shadow-lg: 0 12px 30px oklch(0 0 0 / 0.60);
 
-    --danger: #f87171;
-    --danger-bg: #2a1618;
-    --danger-border: #5a2a2e;
-    --danger-chip-bg: #241416;
+  --login-canvas: linear-gradient(135deg, oklch(0.1371 0.0360 258.53) 0%, oklch(0.2000 0.0350 259) 100%);
+  --login-badge: oklch(0.2800 0.0369 259.97);
 
-    --success: #4ade80;
-    --success-bg: #12251a;
-    --success-border: #245c37;
+  --sub-1: 217 91% 70%;
+  --sub-2: 160 70% 55%;
+  --sub-3: 347 85% 70%;
+  --sub-4: 271 85% 75%;
+  --sub-5: 21 90% 65%;
+  --sub-6: 192 75% 60%;
+  --sub-7: 239 90% 76%;
+  --sub-8: 38 92% 62%;
+  --cmp-a: 0 90% 70%;
+  --cmp-b: 217 91% 70%;
 
-    --warn-bg: #3a2e12;
-    --warn-text: #fbbf24;
-
-    --pin-bg: #16273f;
-    --pin-border: #60a5fa;
-    --pin-text: #93c5fd;
-
-    --selected-bg: #17293d;
-    --active-border: #e8edf5;
-
-    --overlay: rgba(0, 0, 0, 0.6);
-    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5);
-    --shadow-md: 0 2px 12px rgba(0, 0, 0, 0.55);
-    --shadow-lg: 0 12px 30px rgba(0, 0, 0, 0.6);
-
-    --login-canvas: linear-gradient(135deg, #0d131f 0%, #16202f 100%);
-    --login-badge: #1f2b3d;
-
-    --sub-1: 217 91% 70%;
-    --sub-2: 160 70% 55%;
-    --sub-3: 347 85% 70%;
-    --sub-4: 271 85% 75%;
-    --sub-5: 21 90% 65%;
-    --sub-6: 192 75% 60%;
-    --sub-7: 239 90% 76%;
-    --sub-8: 38 92% 62%;
-
-    --cmp-a: 0 90% 70%;
-    --cmp-b: 217 91% 70%;
-  }
+  --pin-border: oklch(0.7800 0.1000 251.48);
+  --pin-text: oklch(0.7800 0.1000 251.48);
+  --danger: oklch(0.70 0.17 25.5);
+  --active-border: var(--ring);
 }
 
 @theme inline {
-  --color-background: var(--bg);
-  --color-foreground: var(--text);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* This app defines --font-geist-sans in layout.tsx; shadcn's generated
+     @theme referenced an undefined --font-sans, so the sans face fell back. */
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
 }
 
 body {
-  background: var(--bg);
-  color: var(--text);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
 
 dialog::backdrop {
   background: var(--overlay);
 }
 
-/*
- * Native controls inherit the surface they sit on. color-scheme handles the
- * popup list and scrollbars; these rules cover the closed control itself.
- */
+/* Native controls inherit the surface they sit on. */
 input,
 select,
 textarea,
 button {
   font-family: inherit;
-  color: var(--text);
+  color: var(--foreground);
 }
 
-/* Checkboxes and radios keep their native rendering - accent-color themes them. */
 input:not([type="checkbox"]):not([type="radio"]),
 select,
 textarea {
-  background: var(--surface);
+  background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
 }
 
 input[type="checkbox"],
 input[type="radio"] {
-  accent-color: var(--accent);
+  accent-color: var(--primary);
 }
 
 input:not([type="checkbox"]):not([type="radio"]):disabled,
 select:disabled,
 textarea:disabled {
-  background: var(--surface-3);
-  color: var(--text-faint);
+  background: var(--muted);
+  color: var(--muted-foreground);
 }
 
 input::placeholder {
-  color: var(--text-faint);
+  color: var(--muted-foreground);
 }
 
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--ring);
   outline-offset: 2px;
 }
 

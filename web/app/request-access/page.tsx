@@ -65,7 +65,7 @@ function RequestAccessContent() {
             background: "var(--login-badge)",
             display: "grid",
             placeItems: "center",
-            color: "var(--accent-fg)",
+            color: "var(--primary-foreground)",
             fontWeight: 800,
             fontSize: 22,
             margin: "0 auto",
@@ -104,9 +104,9 @@ function RequestAccessContent() {
             style={{
               padding: "8px 12px",
               borderRadius: 10,
-              border: "1px solid var(--accent)",
-              background: hoverPrimary ? "var(--accent)" : "var(--surface)",
-              color: hoverPrimary ? "var(--accent-fg)" : "var(--accent)",
+              border: "1px solid var(--primary)",
+              background: hoverPrimary ? "var(--primary)" : "var(--surface)",
+              color: hoverPrimary ? "var(--primary-foreground)" : "var(--primary)",
               fontWeight: 700,
               fontSize: 12,
               cursor: "pointer",
@@ -129,7 +129,7 @@ function RequestAccessContent() {
 
         <div style={{ marginTop: 18, fontSize: 13, color: "var(--text-muted)" }}>
           Need to switch accounts?{" "}
-          <a href="/login" style={{ color: "var(--accent)", fontWeight: 700, textDecoration: "none" }}>
+          <a href="/login" style={{ color: "var(--primary)", fontWeight: 700, textDecoration: "none" }}>
             Back to login
           </a>
         </div>

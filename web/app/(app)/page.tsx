@@ -8,6 +8,7 @@ import { TimetableGrid, CompareTimetableGrid } from "../components/TimetableGrid
 import { CoursePicker } from "../components/CoursePicker";
 import { InfoIconButton, InfoModal } from "../components/InfoModal";
 import { Toast } from "../components/Toast";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 
 const DAYS = ["Mo", "Tu", "We", "Th", "Fr"] as const;
@@ -543,6 +544,7 @@ export default function Home() {
           <div><b>Logged in as:</b> {email}</div>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <ThemeToggle />
           <a
             href="https://docs.google.com/forms/d/e/1FAIpQLSdUPWeLVqBYbBbZunz-tPnI3mvgGDgKN2onmYPKlZ13OcwNUA/viewform?usp=publish-editor"
             target="_blank"
@@ -592,8 +594,8 @@ export default function Home() {
             disabled={loading || selectedCourses.length === 0}
             style={{
               border: "none",
-              background: "var(--accent)",
-              color: "var(--accent-fg)",
+              background: "var(--primary)",
+              color: "var(--primary-foreground)",
               borderRadius: 10,
               padding: "8px 12px",
               fontSize: 13,
@@ -602,10 +604,10 @@ export default function Home() {
               opacity: loading || selectedCourses.length === 0 ? 0.6 : 1,
             }}
             onMouseEnter={(e) => {
-              if (!loading && selectedCourses.length > 0) e.currentTarget.style.background = "var(--accent-hover)";
+              if (!loading && selectedCourses.length > 0) e.currentTarget.style.background = "var(--primary-hover)";
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = "var(--accent)";
+              e.currentTarget.style.background = "var(--primary)";
             }}
           >
             {loading ? "Optimizing..." : "Optimize"}
@@ -1310,7 +1312,7 @@ export default function Home() {
 
               <div style={{ fontWeight: 700 }}>6) P.S.</div>
               <div style={{ marginBottom: 10 }}>
-                This is a work in progress. Please report any issues or feedback to google form on the top right. The app follows your system light or dark theme.
+                This is a work in progress. Please report any issues or feedback to google form on the top right. Use the theme switch in the header to follow your system setting or force light or dark.
               </div>
             </div>
           </div>
