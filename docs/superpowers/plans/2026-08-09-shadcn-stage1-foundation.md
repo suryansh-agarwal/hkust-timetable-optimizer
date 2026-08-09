@@ -76,7 +76,21 @@ cd web && grep -nE "@custom-variant dark|^\.dark|prefers-color-scheme|--sub-1|@i
 
 Expected: `@custom-variant dark (&:is(.dark *))` near the top, a `.dark {` block, **and** the pre-existing `@media (prefers-color-scheme: dark)` block, **and** the pre-existing `--sub-1`. This confirms init appended rather than replaced, which is what Task 2 fixes. Record the line count — it should be roughly 372, up from 208.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Confirm the install did not break the build**
+
+```bash
+cd web && rm -rf .next && npx tsc --noEmit && npx next build
+```
+
+Expected: **both succeed.** The file carries two palettes and the app will
+look wrong, but it is valid CSS and must still compile. This is the check that
+the new dependencies and the `@import "shadcn/tailwind.css"` line resolve.
+
+If either fails, stop and report BLOCKED with the error rather than pressing on
+to Task 2 — a broken install is much easier to diagnose before the whole
+stylesheet is rewritten on top of it.
+
+- [ ] **Step 6: Commit**
 
 ```bash
 git add web/components.json web/lib/utils.ts web/components/ui/button.tsx web/app/globals.css web/package.json web/package-lock.json
@@ -84,10 +98,9 @@ git commit -m "chore(web): run shadcn init
 
 Raw CLI output, committed separately from the theme reconciliation so the
 generated CSS is not interleaved with hand-written changes. globals.css
-currently carries two theme mechanisms; the next commit resolves that."
+currently carries two theme mechanisms and the app looks wrong; it
+compiles, and the next commit resolves the palette."
 ```
-
-Do not run a build yet. The file is in a knowingly inconsistent state until Task 2.
 
 ---
 
