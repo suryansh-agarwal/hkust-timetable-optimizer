@@ -19,6 +19,15 @@ import {
 } from "@/components/ui/dialog";
 import { Info, MessageSquare, X } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 
 const DAYS = ["Mo", "Tu", "We", "Th", "Fr"] as const;
@@ -29,6 +38,12 @@ const TERM_OPTIONS = [
 ] as const;
 
 const DEFAULT_TERM = "2610";
+
+// Base UI treats value="" as "nothing selected" (SelectRoot.js:185), so the
+// "(select)" item would be unselectable and the trigger would fall back to the
+// placeholder. Carry a sentinel through the control and map it back to "" at
+// the state boundary, because compareA/compareB feed the compare view as "".
+const NO_SELECTION = "__none";
 
 // Time options for soft no-after (12:00–20:00 in 30-min steps)
 function genNoAfterTimes(): string[] {
@@ -565,22 +580,22 @@ export default function Home() {
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
         <div style={{ border: "1px solid var(--border)", borderRadius: 12, padding: 14 }}>
-          <div style={{ marginBottom: 10 }}>
-            <label htmlFor="term-select" style={{ display: "block", fontSize: 14, marginBottom: 6 }}>
-              Term
-            </label>
-            <select
-              id="term-select"
+          <div className="mb-3">
+            <Label htmlFor="term-select" className="mb-2 block text-sm">Term</Label>
+            <Select
               value={term}
-              onChange={(e) => handleTermChange(e.target.value)}
-              style={{ padding: 8, width: "100%" }}
+              onValueChange={(v) => handleTermChange(String(v))}
+              items={TERM_OPTIONS as unknown as { value: string; label: string }[]}
             >
-              {TERM_OPTIONS.map((t) => (
-                <option key={t.value} value={t.value}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger id="term-select" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {TERM_OPTIONS.map((t) => (
+                  <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <CoursePicker
@@ -733,49 +748,66 @@ export default function Home() {
           <div style={{ marginTop: 14 }}>
             <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>Weights & style</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text-body)" }}>
-                <span style={{ width: 140 }}>Gap penalty:</span>
-                <select
+              <div className="flex items-center gap-2 text-sm text-foreground">
+                <span className="w-36">Gap penalty:</span>
+                <Select
                   value={gapWeightPreset}
-                  onChange={(e) => setGapWeightPreset(e.target.value as WeightPreset)}
-                  style={{ padding: 6, fontSize: 13, borderRadius: 6 }}
+                  onValueChange={(v) => setGapWeightPreset(v as WeightPreset)}
                 >
-                  <option value="Low">Low</option>
-                  <option value="Med">Med</option>
-                  <option value="High">High</option>
-                </select>
+                  <SelectTrigger size="sm" className="w-28"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Low">Low</SelectItem>
+                    <SelectItem value="Med">Med</SelectItem>
+                    <SelectItem value="High">High</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text-body)" }}>
-                <span style={{ width: 140 }}>Early/late penalty:</span>
-                <select
+              <div className="flex items-center gap-2 text-sm text-foreground">
+                <span className="w-36">Early/late penalty:</span>
+                <Select
                   value={earlyLateWeightPreset}
-                  onChange={(e) => setEarlyLateWeightPreset(e.target.value as WeightPreset)}
-                  style={{ padding: 6, fontSize: 13, borderRadius: 6 }}
+                  onValueChange={(v) => setEarlyLateWeightPreset(v as WeightPreset)}
                 >
-                  <option value="Low">Low</option>
-                  <option value="Med">Med</option>
-                  <option value="High">High</option>
-                </select>
+                  <SelectTrigger size="sm" className="w-28"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Low">Low</SelectItem>
+                    <SelectItem value="Med">Med</SelectItem>
+                    <SelectItem value="High">High</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text-body)" }}>
-                <span style={{ width: 140 }}>Gap shape:</span>
-                <select
+              <div className="flex items-center gap-2 text-sm text-foreground">
+                <span className="w-36">Gap shape:</span>
+                <Select
                   value={gapShape}
-                  onChange={(e) => setGapShape(e.target.value as GapShape)}
-                  style={{ padding: 6, fontSize: 13, borderRadius: 6 }}
+                  onValueChange={(v) => setGapShape(v as GapShape)}
+                  items={[
+                    { value: "no_preference", label: "No preference" },
+                    { value: "consolidated", label: "Prefer one long gap" },
+                    { value: "fragmented", label: "Prefer several short gaps" },
+                  ]}
                 >
-                  <option value="no_preference">No preference</option>
-                  <option value="consolidated">Prefer one long gap</option>
-                  <option value="fragmented">Prefer several short gaps</option>
-                </select>
+                  <SelectTrigger size="sm" className="w-56"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="no_preference">No preference</SelectItem>
+                    <SelectItem value="consolidated">Prefer one long gap</SelectItem>
+                    <SelectItem value="fragmented">Prefer several short gaps</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10, fontSize: 13, color: "var(--text-body)" }}>
-              <label style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                <input type="checkbox" checked={preferOneFreeDay} onChange={(e) => setPreferOneFreeDay(e.target.checked)} />
-                Prefer at least one free weekday
-              </label>
+            <div className="mt-3 flex flex-col gap-2 text-sm text-foreground">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="prefer-one-free-day"
+                  checked={preferOneFreeDay}
+                  onCheckedChange={(checked) => setPreferOneFreeDay(checked === true)}
+                />
+                <Label htmlFor="prefer-one-free-day" className="font-normal">
+                  Prefer at least one free weekday
+                </Label>
+              </div>
             </div>
           </div>
 
@@ -1002,18 +1034,23 @@ export default function Home() {
                       border: "1px solid hsl(var(--cmp-a) / 0.6)",
                     }}
                   />
-                  <label htmlFor="compare-a" style={{ fontSize: 13, fontWeight: 600 }}>Option A:</label>
-                  <select
-                    id="compare-a"
-                    value={compareA}
-                    onChange={(e) => setCompareA(e.target.value)}
-                    style={{ padding: 6, fontSize: 13, borderRadius: 6 }}
+                  <Label htmlFor="compare-a" className="text-sm font-semibold">Option A:</Label>
+                  <Select
+                    value={compareA || NO_SELECTION}
+                    onValueChange={(v) => setCompareA(v === NO_SELECTION ? "" : String(v))}
+                    items={[
+                      { value: NO_SELECTION, label: "(select)" },
+                      ...pinned.map((p) => ({ value: p.id, label: p.name })),
+                    ]}
                   >
-                    <option value="">(select)</option>
-                    {pinned.map((p) => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
-                    ))}
-                  </select>
+                    <SelectTrigger id="compare-a" size="sm" className="w-48"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NO_SELECTION}>(select)</SelectItem>
+                      {pinned.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <span
@@ -1026,18 +1063,23 @@ export default function Home() {
                       border: "1px solid hsl(var(--cmp-b) / 0.6)",
                     }}
                   />
-                  <label htmlFor="compare-b" style={{ fontSize: 13, fontWeight: 600 }}>Option B:</label>
-                  <select
-                    id="compare-b"
-                    value={compareB}
-                    onChange={(e) => setCompareB(e.target.value)}
-                    style={{ padding: 6, fontSize: 13, borderRadius: 6 }}
+                  <Label htmlFor="compare-b" className="text-sm font-semibold">Option B:</Label>
+                  <Select
+                    value={compareB || NO_SELECTION}
+                    onValueChange={(v) => setCompareB(v === NO_SELECTION ? "" : String(v))}
+                    items={[
+                      { value: NO_SELECTION, label: "(select)" },
+                      ...pinned.map((p) => ({ value: p.id, label: p.name })),
+                    ]}
                   >
-                    <option value="">(select)</option>
-                    {pinned.map((p) => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
-                    ))}
-                  </select>
+                    <SelectTrigger id="compare-b" size="sm" className="w-48"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NO_SELECTION}>(select)</SelectItem>
+                      {pinned.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             )}
