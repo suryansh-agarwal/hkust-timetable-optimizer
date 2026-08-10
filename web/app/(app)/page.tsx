@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { optimizeRanked, Prefs, SectionLock } from "@/lib/api";
 import { TimetableGrid, CompareTimetableGrid } from "../components/TimetableGrid";
 import { CoursePicker } from "../components/CoursePicker";
+import { DayCheckboxGroup, DayTimeGroup, type DayPref } from "../components/DayTimePrefs";
 import { toast } from "sonner";
 import { ThemeToggle } from "@/components/theme-toggle";
 import {
@@ -109,9 +110,6 @@ const GAP_WEIGHTS = { Low: 0.05, Med: 0.10, High: 0.20 } as const;
 const EARLY_LATE_WEIGHTS = { Low: 0.25, Med: 0.50, High: 1.00 } as const;
 type WeightPreset = "Low" | "Med" | "High";
 type GapShape = "no_preference" | "consolidated" | "fragmented";
-
-// Per-day soft constraint state
-type SoftDayPref = { enabled: boolean; time: string };
 
 function minutesToTime(m: number) {
   const hh = Math.floor(m / 60).toString().padStart(2, "0");
@@ -346,29 +344,29 @@ export default function Home() {
   const [softFreeDays, setSoftFreeDays] = useState<string[]>([]);
 
   // Per-day hard no-after constraints
-  const [hardNoAfter, setHardNoAfter] = useState<Record<string, SoftDayPref>>(() => {
-    const init: Record<string, SoftDayPref> = {};
+  const [hardNoAfter, setHardNoAfter] = useState<Record<string, DayPref>>(() => {
+    const init: Record<string, DayPref> = {};
     for (const d of DAYS) init[d] = { enabled: false, time: "15:00" };
     return init;
   });
 
   // Per-day hard no-before constraints
-  const [hardNoBefore, setHardNoBefore] = useState<Record<string, SoftDayPref>>(() => {
-    const init: Record<string, SoftDayPref> = {};
+  const [hardNoBefore, setHardNoBefore] = useState<Record<string, DayPref>>(() => {
+    const init: Record<string, DayPref> = {};
     for (const d of DAYS) init[d] = { enabled: false, time: "09:00" };
     return init;
   });
 
   // Per-day soft no-after constraints
-  const [softNoAfter, setSoftNoAfter] = useState<Record<string, SoftDayPref>>(() => {
-    const init: Record<string, SoftDayPref> = {};
+  const [softNoAfter, setSoftNoAfter] = useState<Record<string, DayPref>>(() => {
+    const init: Record<string, DayPref> = {};
     for (const d of DAYS) init[d] = { enabled: false, time: "15:00" };
     return init;
   });
 
   // Per-day soft no-before constraints
-  const [softNoBefore, setSoftNoBefore] = useState<Record<string, SoftDayPref>>(() => {
-    const init: Record<string, SoftDayPref> = {};
+  const [softNoBefore, setSoftNoBefore] = useState<Record<string, DayPref>>(() => {
+    const init: Record<string, DayPref> = {};
     for (const d of DAYS) init[d] = { enabled: false, time: "09:00" };
     return init;
   });
@@ -633,90 +631,36 @@ export default function Home() {
               {/* Hard Free Days (multi-select) */}
               <div>
                 <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Must be free</div>
-                <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                  {DAYS.map((d) => (
-                    <label key={d} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13 }}>
-                      <input
-                        type="checkbox"
-                        checked={hardFreeDays.includes(d)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setHardFreeDays([...hardFreeDays, d]);
-                          } else {
-                            setHardFreeDays(hardFreeDays.filter((x) => x !== d));
-                          }
-                        }}
-                      />
-                      {d}
-                    </label>
-                  ))}
-                </div>
+                <DayCheckboxGroup
+                  idPrefix="hard-free"
+                  days={DAYS}
+                  selected={hardFreeDays}
+                  onChange={setHardFreeDays}
+                />
               </div>
 
               {/* Hard No Classes After */}
               <div style={{ marginTop: 14 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>No classes after</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {DAYS.map((d) => (
-                    <div key={d} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-                      <label style={{ display: "flex", alignItems: "center", gap: 4, width: 50 }}>
-                        <input
-                          type="checkbox"
-                          checked={hardNoAfter[d].enabled}
-                          onChange={(e) =>
-                            setHardNoAfter({ ...hardNoAfter, [d]: { ...hardNoAfter[d], enabled: e.target.checked } })
-                          }
-                        />
-                        {d}
-                      </label>
-                      <select
-                        value={hardNoAfter[d].time}
-                        disabled={!hardNoAfter[d].enabled}
-                        onChange={(e) =>
-                          setHardNoAfter({ ...hardNoAfter, [d]: { ...hardNoAfter[d], time: e.target.value } })
-                        }
-                        style={{ padding: 4, fontSize: 12, borderRadius: 4, opacity: hardNoAfter[d].enabled ? 1 : 0.5 }}
-                      >
-                        {NO_AFTER_TIMES.map((t) => (
-                          <option key={t} value={t}>{t}</option>
-                        ))}
-                      </select>
-                    </div>
-                  ))}
-                </div>
+                <DayTimeGroup
+                  idPrefix="hard-after"
+                  days={DAYS}
+                  values={hardNoAfter}
+                  times={NO_AFTER_TIMES}
+                  onChange={setHardNoAfter}
+                />
               </div>
 
               {/* Hard No Classes Before */}
               <div style={{ marginTop: 14 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>No classes before</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {DAYS.map((d) => (
-                    <div key={d} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-                      <label style={{ display: "flex", alignItems: "center", gap: 4, width: 50 }}>
-                        <input
-                          type="checkbox"
-                          checked={hardNoBefore[d].enabled}
-                          onChange={(e) =>
-                            setHardNoBefore({ ...hardNoBefore, [d]: { ...hardNoBefore[d], enabled: e.target.checked } })
-                          }
-                        />
-                        {d}
-                      </label>
-                      <select
-                        value={hardNoBefore[d].time}
-                        disabled={!hardNoBefore[d].enabled}
-                        onChange={(e) =>
-                          setHardNoBefore({ ...hardNoBefore, [d]: { ...hardNoBefore[d], time: e.target.value } })
-                        }
-                        style={{ padding: 4, fontSize: 12, borderRadius: 4, opacity: hardNoBefore[d].enabled ? 1 : 0.5 }}
-                      >
-                        {NO_BEFORE_TIMES.map((t) => (
-                          <option key={t} value={t}>{t}</option>
-                        ))}
-                      </select>
-                    </div>
-                  ))}
-                </div>
+                <DayTimeGroup
+                  idPrefix="hard-before"
+                  days={DAYS}
+                  values={hardNoBefore}
+                  times={NO_BEFORE_TIMES}
+                  onChange={setHardNoBefore}
+                />
               </div>
             </div>
 
@@ -750,90 +694,36 @@ export default function Home() {
               {/* Soft Free Days (multi-select) */}
               <div>
                 <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Prefer free</div>
-                <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                  {DAYS.map((d) => (
-                    <label key={d} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13 }}>
-                      <input
-                        type="checkbox"
-                        checked={softFreeDays.includes(d)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSoftFreeDays([...softFreeDays, d]);
-                          } else {
-                            setSoftFreeDays(softFreeDays.filter((x) => x !== d));
-                          }
-                        }}
-                      />
-                      {d}
-                    </label>
-                  ))}
-                </div>
+                <DayCheckboxGroup
+                  idPrefix="soft-free"
+                  days={DAYS}
+                  selected={softFreeDays}
+                  onChange={setSoftFreeDays}
+                />
               </div>
 
               {/* Soft No Classes After */}
               <div style={{ marginTop: 14 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>No classes after</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {DAYS.map((d) => (
-                    <div key={d} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-                      <label style={{ display: "flex", alignItems: "center", gap: 4, width: 50 }}>
-                        <input
-                          type="checkbox"
-                          checked={softNoAfter[d].enabled}
-                          onChange={(e) =>
-                            setSoftNoAfter({ ...softNoAfter, [d]: { ...softNoAfter[d], enabled: e.target.checked } })
-                          }
-                        />
-                        {d}
-                      </label>
-                      <select
-                        value={softNoAfter[d].time}
-                        disabled={!softNoAfter[d].enabled}
-                        onChange={(e) =>
-                          setSoftNoAfter({ ...softNoAfter, [d]: { ...softNoAfter[d], time: e.target.value } })
-                        }
-                        style={{ padding: 4, fontSize: 12, borderRadius: 4, opacity: softNoAfter[d].enabled ? 1 : 0.5 }}
-                      >
-                        {NO_AFTER_TIMES.map((t) => (
-                          <option key={t} value={t}>{t}</option>
-                        ))}
-                      </select>
-                    </div>
-                  ))}
-                </div>
+                <DayTimeGroup
+                  idPrefix="soft-after"
+                  days={DAYS}
+                  values={softNoAfter}
+                  times={NO_AFTER_TIMES}
+                  onChange={setSoftNoAfter}
+                />
               </div>
 
               {/* Soft No Classes Before */}
               <div style={{ marginTop: 14 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>No classes before</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {DAYS.map((d) => (
-                    <div key={d} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-                      <label style={{ display: "flex", alignItems: "center", gap: 4, width: 50 }}>
-                        <input
-                          type="checkbox"
-                          checked={softNoBefore[d].enabled}
-                          onChange={(e) =>
-                            setSoftNoBefore({ ...softNoBefore, [d]: { ...softNoBefore[d], enabled: e.target.checked } })
-                          }
-                        />
-                        {d}
-                      </label>
-                      <select
-                        value={softNoBefore[d].time}
-                        disabled={!softNoBefore[d].enabled}
-                        onChange={(e) =>
-                          setSoftNoBefore({ ...softNoBefore, [d]: { ...softNoBefore[d], time: e.target.value } })
-                        }
-                        style={{ padding: 4, fontSize: 12, borderRadius: 4, opacity: softNoBefore[d].enabled ? 1 : 0.5 }}
-                      >
-                        {NO_BEFORE_TIMES.map((t) => (
-                          <option key={t} value={t}>{t}</option>
-                        ))}
-                      </select>
-                    </div>
-                  ))}
-                </div>
+                <DayTimeGroup
+                  idPrefix="soft-before"
+                  days={DAYS}
+                  values={softNoBefore}
+                  times={NO_BEFORE_TIMES}
+                  onChange={setSoftNoBefore}
+                />
               </div>
 
             </div>
