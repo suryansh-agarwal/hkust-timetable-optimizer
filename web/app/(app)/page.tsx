@@ -6,9 +6,18 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { optimizeRanked, Prefs, SectionLock } from "@/lib/api";
 import { TimetableGrid, CompareTimetableGrid } from "../components/TimetableGrid";
 import { CoursePicker } from "../components/CoursePicker";
-import { InfoIconButton, InfoModal } from "../components/InfoModal";
-import { Toast } from "../components/Toast";
+import { toast } from "sonner";
 import { ThemeToggle } from "@/components/theme-toggle";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Info, MessageSquare, X } from "lucide-react";
+import { Button, buttonVariants } from "@/components/ui/button";
 
 
 const DAYS = ["Mo", "Tu", "We", "Th", "Fr"] as const;
@@ -228,8 +237,6 @@ export default function Home() {
   const [userId, setUserId] = useState<string | null>(null);
   const [term, setTerm] = useState<string>(DEFAULT_TERM);
   const [showHelp, setShowHelp] = useState(true);
-  const [openHardInfo, setOpenHardInfo] = useState(false);
-  const [openSoftInfo, setOpenSoftInfo] = useState(false);
 
   const [selectedCourses, setSelectedCourses] = useState<string[]>([]);
   const [instructorLocks, setInstructorLocks] = useState<Record<string, string>>({});
@@ -378,9 +385,7 @@ export default function Home() {
   const [activeIdx, setActiveIdx] = useState(0);
   const [error, setError] = useState<string>("");
   const [didJustOptimize, setDidJustOptimize] = useState(false);
-  const [toastOpen, setToastOpen] = useState(false);
   const resultsRef = useRef<HTMLDivElement | null>(null);
-  const toastMessage = "Timetable not possible with current subjects";
 
   // ---- Pin + Compare state ----
   const [pinned, setPinned] = useState<Pinned[]>([]);
@@ -430,7 +435,6 @@ export default function Home() {
     setResult(null);
     setActiveIdx(0);
     setDidJustOptimize(false);
-    setToastOpen(false);
 
     // Validate time constraints before running
     const conflicts = validateTimeConstraints(hardNoBefore, hardNoAfter, softNoBefore, softNoAfter, DAYS);
@@ -504,7 +508,7 @@ export default function Home() {
       setResult(data);
       const resultCount = data?.results?.length ?? 0;
       if (resultCount === 0) {
-        setToastOpen(true);
+        toast.error("Timetable not possible with current subjects");
       } else {
         setDidJustOptimize(true);
       }
@@ -529,12 +533,6 @@ export default function Home() {
   
   return (
     <div style={{ maxWidth: 1200, margin: "0 auto", padding: "20px 24px", fontFamily: "system-ui", width: "100%" }}>
-      <Toast
-        open={toastOpen}
-        variant="error"
-        message={toastMessage}
-        onClose={() => setToastOpen(false)}
-      />
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <div>
           <h1 style={{ fontSize: 28, fontWeight: 700, margin: 0 }}>HKUST Timetable Optimizer</h1>
@@ -549,69 +547,22 @@ export default function Home() {
             href="https://docs.google.com/forms/d/e/1FAIpQLSdUPWeLVqBYbBbZunz-tPnI3mvgGDgKN2onmYPKlZ13OcwNUA/viewform?usp=publish-editor"
             target="_blank"
             rel="noreferrer"
-            style={{
-              border: "1px solid var(--border)",
-              background: "var(--surface)",
-              borderRadius: 10,
-              padding: "8px 12px",
-              fontSize: 13,
-              fontWeight: 700,
-              cursor: "pointer",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 8,
-              color: "inherit",
-              textDecoration: "none",
-            }}
             aria-label="Leave feedback"
+            className={buttonVariants({ variant: "outline", size: "sm" })}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden>
-              <path
-                fill="currentColor"
-                d="M5 4h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9l-4 3v-3H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm0 2v9h2v1.5L9 15h10V6H5Z"
-              />
-            </svg>
+            <MessageSquare className="size-4" aria-hidden />
             Feedback
           </a>
-          <button
-            type="button"
-            onClick={() => setShowHelp(true)}
-            style={{
-              border: "1px solid var(--border)",
-              background: "var(--surface)",
-              borderRadius: 10,
-              padding: "8px 12px",
-              fontSize: 13,
-              fontWeight: 700,
-              cursor: "pointer",
-            }}
-          >
+          <Button variant="outline" size="sm" onClick={() => setShowHelp(true)}>
             How to use?
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            size="sm"
             onClick={runOptimize}
             disabled={loading || selectedCourses.length === 0}
-            style={{
-              border: "none",
-              background: "var(--primary)",
-              color: "var(--primary-foreground)",
-              borderRadius: 10,
-              padding: "8px 12px",
-              fontSize: 13,
-              fontWeight: 700,
-              cursor: loading || selectedCourses.length === 0 ? "not-allowed" : "pointer",
-              opacity: loading || selectedCourses.length === 0 ? 0.6 : 1,
-            }}
-            onMouseEnter={(e) => {
-              if (!loading && selectedCourses.length > 0) e.currentTarget.style.background = "var(--primary-hover)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "var(--primary)";
-            }}
           >
             {loading ? "Optimizing..." : "Optimize"}
-          </button>
+          </Button>
         </div>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
@@ -655,7 +606,28 @@ export default function Home() {
             <div style={{ border: "1px solid var(--border-subtle)", borderRadius: 10, padding: 12, background: "var(--surface-2)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, fontWeight: 700, marginBottom: 8 }}>
                 <span>Hard preferences</span>
-                <InfoIconButton onClick={() => setOpenHardInfo(true)} />
+                <Dialog>
+                  <DialogTrigger
+                    aria-label="About hard preferences"
+                    className="inline-flex size-5 items-center justify-center rounded-full border border-border text-xs font-bold text-muted-foreground hover:bg-muted"
+                  >
+                    <Info className="size-3" aria-hidden />
+                  </DialogTrigger>
+                  <DialogContent className="max-w-md sm:max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Hard preferences</DialogTitle>
+                      <DialogDescription>
+                        Hard preferences are non-negotiable constraints. If a timetable
+                        violates one, it is rejected.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <ul className="ml-4 list-disc text-sm text-foreground">
+                      <li>No classes before 10:30</li>
+                      <li>Keep Friday completely free</li>
+                      <li>Avoid clashes (required)</li>
+                    </ul>
+                  </DialogContent>
+                </Dialog>
               </div>
 
               {/* Hard Free Days (multi-select) */}
@@ -751,7 +723,28 @@ export default function Home() {
             <div style={{ border: "1px solid var(--border-subtle)", borderRadius: 10, padding: 12 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, fontWeight: 700, marginBottom: 8 }}>
                 <span>Soft preferences</span>
-                <InfoIconButton onClick={() => setOpenSoftInfo(true)} />
+                <Dialog>
+                  <DialogTrigger
+                    aria-label="About soft preferences"
+                    className="inline-flex size-5 items-center justify-center rounded-full border border-border text-xs font-bold text-muted-foreground hover:bg-muted"
+                  >
+                    <Info className="size-3" aria-hidden />
+                  </DialogTrigger>
+                  <DialogContent className="max-w-md sm:max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Soft preferences</DialogTitle>
+                      <DialogDescription>
+                        Soft preferences are nice-to-haves. The optimiser will try to
+                        satisfy them, but may trade them off to find a feasible timetable.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <ul className="ml-4 list-disc text-sm text-foreground">
+                      <li>Minimize gaps between classes</li>
+                      <li>Prefer compact schedules</li>
+                      <li>Prefer fewer days on campus</li>
+                    </ul>
+                  </DialogContent>
+                </Dialog>
               </div>
 
               {/* Soft Free Days (multi-select) */}
@@ -900,26 +893,6 @@ export default function Home() {
         </div>
       </div>
 
-      <InfoModal open={openHardInfo} title="Hard preferences" onClose={() => setOpenHardInfo(false)}>
-        <div>Hard preferences are <strong>non-negotiable constraints</strong>.</div>
-        <div>If a timetable violates a hard preference, it’s rejected.</div>
-        <div style={{ marginTop: 10, fontWeight: 600 }}>Examples:</div>
-        <ul style={{ margin: "6px 0 0 18px" }}>
-          <li>No classes before 10:30</li>
-          <li>Keep Friday completely free</li>
-          <li>Avoid clashes (required)</li>
-        </ul>
-      </InfoModal>
-      <InfoModal open={openSoftInfo} title="Soft preferences" onClose={() => setOpenSoftInfo(false)}>
-        <div>Soft preferences are <strong>nice-to-haves</strong>.</div>
-        <div>The optimizer will try to satisfy them, but may trade them off to find a feasible timetable.</div>
-        <div style={{ marginTop: 10, fontWeight: 600 }}>Examples:</div>
-        <ul style={{ margin: "6px 0 0 18px" }}>
-          <li>Minimize gaps between classes</li>
-          <li>Prefer compact schedules</li>
-          <li>Prefer fewer days on campus</li>
-        </ul>
-      </InfoModal>
       <div ref={resultsRef} id="results" style={{ scrollMarginTop: 90 }}>
         {result && (
           <div style={{ marginTop: 14, border: "1px solid var(--border)", borderRadius: 12, padding: 14 }}>
@@ -970,26 +943,17 @@ export default function Home() {
                     <div style={{ fontWeight: 800, fontSize: 14 }}>Option #{i + 1}</div>
                     <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                       <div style={{ fontWeight: 900, fontSize: 16 }}>Score {r.score.toFixed(1)}</div>
-                      <button
-                        type="button"
+                      <Button
+                        variant={isPinned ? "default" : "outline"}
+                        size="sm"
                         onClick={(e) => {
                           e.stopPropagation();
                           pinResultOption(r, i);
                         }}
-                        style={{
-                          border: isPinned ? "1px solid var(--pin-border)" : "1px solid var(--border)",
-                          background: isPinned ? "var(--pin-bg)" : "var(--surface-2)",
-                          borderRadius: 8,
-                          padding: "4px 8px",
-                          fontSize: 11,
-                          fontWeight: 700,
-                          cursor: "pointer",
-                          color: isPinned ? "var(--pin-text)" : "var(--text-strong)",
-                        }}
                         title={isPinned ? "Pinned" : "Pin this option for comparison"}
                       >
                         {isPinned ? "✅ Pinned" : "📌 Pin"}
-                      </button>
+                      </Button>
                     </div>
                   </div>
 
@@ -1120,22 +1084,15 @@ export default function Home() {
                       }}
                     />
                     <span style={{ fontSize: 12, color: "var(--text-subtle)" }}>{p.score.toFixed(1)}</span>
-                    <button
-                      type="button"
+                    <Button
+                      variant="ghost"
+                      size="icon"
                       onClick={() => unpin(p.id)}
-                      style={{
-                        border: "none",
-                        background: "transparent",
-                        cursor: "pointer",
-                        fontSize: 14,
-                        color: "var(--text-faint)",
-                        padding: 0,
-                        lineHeight: 1,
-                      }}
                       title="Unpin"
+                      aria-label="Unpin"
                     >
-                      ×
-                    </button>
+                      <X className="size-4" aria-hidden />
+                    </Button>
                   </div>
                 ))}
               </div>
@@ -1220,105 +1177,44 @@ export default function Home() {
           </div>
         )}
       </div>
-      {showHelp && (
-        <>
-          <button
-            type="button"
-            aria-label="Close help"
-            onClick={() => setShowHelp(false)}
-            style={{
-              position: "fixed",
-              inset: 0,
-              border: "none",
-              background: "var(--overlay)",
-              padding: 0,
-              margin: 0,
-              zIndex: 40,
-            }}
-          />
-          <dialog
-            open
-            aria-label="How to use HKUST Timetable Optimizer"
-            style={{
-              border: "none",
-              padding: 0,
-              background: "transparent",
-              position: "fixed",
-              inset: 0,
-              width: "100%",
-              height: "100%",
-              margin: 0,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              zIndex: 50,
-            }}
-          >
-            <div
-              style={{
-                background: "var(--surface)",
-                borderRadius: 14,
-                padding: 20,
-                width: "100%",
-                maxWidth: 760,
-                maxHeight: "85vh",
-                overflowY: "auto",
-                boxShadow: "var(--shadow-lg)",
-              }}
-            >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-              <div style={{ fontSize: 18, fontWeight: 800 }}>How to use</div>
-              <button
-                type="button"
-                onClick={() => setShowHelp(false)}
-                aria-label="Close"
-                style={{
-                  border: "none",
-                  background: "transparent",
-                  fontSize: 20,
-                  cursor: "pointer",
-                  color: "var(--text-muted)",
-                }}
-              >
-                ×
-              </button>
-            </div>
-            <div style={{ marginTop: 12, fontSize: 14, color: "var(--text-body)", lineHeight: 1.5 }}>
-              <div style={{ fontWeight: 700 }}>1) Choose a term</div>
-              <div style={{ marginBottom: 10 }}>
-                Pick “2026 Fall”, “2026 Summer” or “2026 Spring”. The label is just for clarity, but it loads the right term data behind the scenes.
-              </div>
-
-              <div style={{ fontWeight: 700 }}>2) Add courses</div>
-              <div style={{ marginBottom: 10 }}>
-                Use the search box to find a course by code or title, then click “Add”. Selected courses show as chips you can remove.
-              </div>
-
-              <div style={{ fontWeight: 700 }}>3) Set preferences</div>
-              <div style={{ marginBottom: 10 }}>
-                <div><b>Hard</b> preferences are strict rules (e.g. “Must be free on Tue”). Any schedule that violates them is rejected.</div>
-                <div><b>Soft</b> preferences are scored (e.g. “No classes after 5pm”). The optimizer tries to minimize these penalties.</div>
-              </div>
-
-              <div style={{ fontWeight: 700 }}>4) Optimize</div>
-              <div style={{ marginBottom: 10 }}>
-                Click “Optimize” to generate the best schedules. Each option shows a score and key tradeoffs. (it may take up to a minute to load the results)
-              </div>
-
-              <div style={{ fontWeight: 700 }}>5) Compare results</div>
-              <div style={{ marginBottom: 10 }}>
-                Pin options you like, then select two to overlay and compare. This helps you choose between close tradeoffs.
-              </div>
-
-              <div style={{ fontWeight: 700 }}>6) P.S.</div>
-              <div style={{ marginBottom: 10 }}>
-                This is a work in progress. Please report any issues or feedback to google form on the top right. Use the theme switch in the header to follow your system setting or force light or dark.
-              </div>
-            </div>
+      <Dialog open={showHelp} onOpenChange={setShowHelp}>
+        {/* DialogContent's base class hardcodes `sm:max-w-sm`. tailwind-merge treats
+            `max-w-*` and `sm:max-w-*` as separate groups, so an unprefixed `max-w-2xl`
+            alone loses to that base class at >=640px (Tailwind emits `.sm:max-w-sm`
+            after `.max-w-2xl`). Repeat the width at the `sm:` breakpoint so it wins. */}
+        <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>How to use</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 text-sm text-foreground">
+            <section>
+              <h3 className="font-bold">1) Choose a term</h3>
+              <p>Pick “2026 Fall”, “2026 Summer” or “2026 Spring”. The label is just for clarity, but it loads the right term data behind the scenes.</p>
+            </section>
+            <section>
+              <h3 className="font-bold">2) Add courses</h3>
+              <p>Use the search box to find a course by code or title, then click “Add”. Selected courses show as chips you can remove.</p>
+            </section>
+            <section>
+              <h3 className="font-bold">3) Set preferences</h3>
+              <p><b>Hard</b> preferences are strict rules (e.g. “Must be free on Tue”). Any schedule that violates them is rejected.</p>
+              <p><b>Soft</b> preferences are scored (e.g. “No classes after 5pm”). The optimizer tries to minimize these penalties.</p>
+            </section>
+            <section>
+              <h3 className="font-bold">4) Optimize</h3>
+              <p>Click “Optimize” to generate the best schedules. Each option shows a score and key tradeoffs. (it may take up to a minute to load the results)</p>
+            </section>
+            <section>
+              <h3 className="font-bold">5) Compare results</h3>
+              <p>Pin options you like, then select two to overlay and compare. This helps you choose between close tradeoffs.</p>
+            </section>
+            <section>
+              <h3 className="font-bold">6) P.S.</h3>
+              <p>This is a work in progress. Please report any issues or feedback to google form on the top right. Use the theme switch in the header to follow your system setting or force light or dark.</p>
+            </section>
           </div>
-          </dialog>
-        </>
-      )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

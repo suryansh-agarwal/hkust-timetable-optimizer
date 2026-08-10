@@ -3,6 +3,7 @@
 import { Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { Button } from "@/components/ui/button";
 
 function LoginContent() {
   const supabase = createClient();
@@ -10,8 +11,6 @@ function LoginContent() {
   const [loadingEmail, setLoadingEmail] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [hoverPrimary, setHoverPrimary] = useState(false);
-  const [hoverEmail, setHoverEmail] = useState(false);
   const [emailInput, setEmailInput] = useState("");
   const searchParams = useSearchParams();
   const nextPath = useMemo(() => searchParams.get("next") ?? "/", [searchParams]);
@@ -125,29 +124,10 @@ function LoginContent() {
         </div>
 
         <div style={{ marginTop: 20, display: "grid", gap: 12 }}>
-          <button
+          <Button
             onClick={continueWithGoogle}
             disabled={loadingGoogle}
-            onMouseEnter={() => setHoverPrimary(true)}
-            onMouseLeave={() => setHoverPrimary(false)}
-            style={{
-              width: "100%",
-              padding: "12px 14px",
-              borderRadius: 12,
-              border: "1px solid var(--border)",
-              background: hoverPrimary ? "var(--primary-hover)" : "var(--primary)",
-              color: "var(--primary-foreground)",
-              fontWeight: 700,
-              fontSize: 14,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 10,
-              transition: "transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease",
-              transform: hoverPrimary ? "translateY(-1px)" : "translateY(0)",
-              boxShadow: hoverPrimary ? "var(--shadow-lg)" : "none",
-            }}
+            className="w-full"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>
               <path
@@ -156,7 +136,7 @@ function LoginContent() {
               />
             </svg>
             {loadingGoogle ? "Redirecting..." : "Continue with Google"}
-          </button>
+          </Button>
           <div
             style={{
               display: "flex",
@@ -189,32 +169,14 @@ function LoginContent() {
                 outline: "none",
               }}
             />
-            <button
+            <Button
               type="submit"
+              variant="outline"
               disabled={loadingEmail}
-              onMouseEnter={() => setHoverEmail(true)}
-              onMouseLeave={() => setHoverEmail(false)}
-              style={{
-                width: "100%",
-                padding: "12px 14px",
-                borderRadius: 12,
-                border: "1px solid var(--border)",
-                background: hoverEmail ? "var(--surface-2)" : "var(--surface)",
-                color: "var(--text-strong)",
-                fontWeight: 700,
-                fontSize: 14,
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 10,
-                transition: "transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease",
-                transform: hoverEmail ? "translateY(-1px)" : "translateY(0)",
-                boxShadow: hoverEmail ? "var(--shadow-lg)" : "none",
-              }}
+              className="w-full"
             >
               {loadingEmail ? "Sending..." : "Continue with email"}
-            </button>
+            </Button>
           </form>
           {err && <div style={{ marginTop: 6, color: "var(--danger)", fontWeight: 600 }}>Error: {err}</div>}
           {notice && <div style={{ marginTop: 6, color: "var(--pin-text)", fontWeight: 600 }}>{notice}</div>}

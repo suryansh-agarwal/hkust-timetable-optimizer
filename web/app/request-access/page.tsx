@@ -3,12 +3,12 @@
 import { createClient } from "@/lib/supabase/client";
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { Button } from "@/components/ui/button";
 
 function RequestAccessContent() {
   const supabase = createClient();
   const [email, setEmail] = useState<string>("");
   const [copied, setCopied] = useState(false);
-  const [hoverPrimary, setHoverPrimary] = useState(false);
   const searchParams = useSearchParams();
 
   useEffect(() => {
@@ -95,29 +95,14 @@ function RequestAccessContent() {
           <div style={{ fontWeight: 700, color: "var(--text-strong)", fontSize: 14 }}>
             {email || "your email"}
           </div>
-          <button
+          <Button
             type="button"
+            variant="default"
             onClick={copyEmail}
-            onMouseEnter={() => setHoverPrimary(true)}
-            onMouseLeave={() => setHoverPrimary(false)}
             disabled={!email}
-            style={{
-              padding: "8px 12px",
-              borderRadius: 10,
-              border: "1px solid var(--primary)",
-              background: hoverPrimary ? "var(--primary)" : "var(--surface)",
-              color: hoverPrimary ? "var(--primary-foreground)" : "var(--primary)",
-              fontWeight: 700,
-              fontSize: 12,
-              cursor: "pointer",
-              transition: "transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, color 0.15s ease",
-              transform: hoverPrimary ? "translateY(-1px)" : "translateY(0)",
-              boxShadow: hoverPrimary ? "var(--shadow-md)" : "none",
-              opacity: email ? 1 : 0.5,
-            }}
           >
             {copied ? "Copied" : "Copy email"}
-          </button>
+          </Button>
         </div>
 
         <div style={{ marginTop: 18, fontSize: 14, color: "var(--text-body)" }}>
