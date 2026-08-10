@@ -199,11 +199,17 @@ body {
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
 
-/* Native controls inherit the surface they sit on. */
+/* Native controls inherit the surface they sit on. `button` is deliberately
+   excluded: every button in authored code is now shadcn's Button, which sets
+   its own text colour per variant (e.g. text-primary-foreground) via a
+   Tailwind utility in @layer utilities. This rule lives outside any cascade
+   layer, and unlayered declarations always beat layered ones regardless of
+   specificity — so a `color` here would silently win over the component's
+   utility class on every variant. font-family is dropped too since it only
+   ever mattered for the button case. */
 input,
 select,
-textarea,
-button {
+textarea {
   font-family: inherit;
   color: var(--foreground);
 }

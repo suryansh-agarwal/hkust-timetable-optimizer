@@ -613,7 +613,7 @@ export default function Home() {
                   >
                     <Info className="size-3" aria-hidden />
                   </DialogTrigger>
-                  <DialogContent className="max-w-md">
+                  <DialogContent className="max-w-md sm:max-w-md">
                     <DialogHeader>
                       <DialogTitle>Hard preferences</DialogTitle>
                       <DialogDescription>
@@ -730,7 +730,7 @@ export default function Home() {
                   >
                     <Info className="size-3" aria-hidden />
                   </DialogTrigger>
-                  <DialogContent className="max-w-md">
+                  <DialogContent className="max-w-md sm:max-w-md">
                     <DialogHeader>
                       <DialogTitle>Soft preferences</DialogTitle>
                       <DialogDescription>
@@ -1178,7 +1178,11 @@ export default function Home() {
         )}
       </div>
       <Dialog open={showHelp} onOpenChange={setShowHelp}>
-        <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+        {/* DialogContent's base class hardcodes `sm:max-w-sm`. tailwind-merge treats
+            `max-w-*` and `sm:max-w-*` as separate groups, so an unprefixed `max-w-2xl`
+            alone loses to that base class at >=640px (Tailwind emits `.sm:max-w-sm`
+            after `.max-w-2xl`). Repeat the width at the `sm:` breakpoint so it wins. */}
+        <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>How to use</DialogTitle>
           </DialogHeader>
