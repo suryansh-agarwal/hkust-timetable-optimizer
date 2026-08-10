@@ -1,5 +1,15 @@
 "use client";
 
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
 /**
  * The day-row preference controls, extracted from page.tsx.
  *
@@ -26,24 +36,22 @@ export function DayCheckboxGroup({
   onChange: (days: string[]) => void;
 }>) {
   return (
-    <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-      {days.map((d) => (
-        <label key={d} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13 }}>
-          <input
-            type="checkbox"
-            id={`${idPrefix}-${d}`}
-            checked={selected.includes(d)}
-            onChange={(e) => {
-              if (e.target.checked) {
-                onChange([...selected, d]);
-              } else {
-                onChange(selected.filter((x) => x !== d));
+    <div className="flex flex-wrap gap-3">
+      {days.map((d) => {
+        const id = `${idPrefix}-${d}`;
+        return (
+          <div key={d} className="flex items-center gap-2">
+            <Checkbox
+              id={id}
+              checked={selected.includes(d)}
+              onCheckedChange={(checked) =>
+                onChange(checked ? [...selected, d] : selected.filter((x) => x !== d))
               }
-            }}
-          />
-          {d}
-        </label>
-      ))}
+            />
+            <Label htmlFor={id} className="text-sm font-normal">{d}</Label>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -62,30 +70,38 @@ export function DayTimeGroup({
   onChange: (next: Record<string, DayPref>) => void;
 }>) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-      {days.map((d) => (
-        <div key={d} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-          <label style={{ display: "flex", alignItems: "center", gap: 4, width: 50 }}>
-            <input
-              type="checkbox"
-              id={`${idPrefix}-${d}`}
-              checked={values[d].enabled}
-              onChange={(e) => onChange({ ...values, [d]: { ...values[d], enabled: e.target.checked } })}
-            />
-            {d}
-          </label>
-          <select
-            value={values[d].time}
-            disabled={!values[d].enabled}
-            onChange={(e) => onChange({ ...values, [d]: { ...values[d], time: e.target.value } })}
-            style={{ padding: 4, fontSize: 12, borderRadius: 4, opacity: values[d].enabled ? 1 : 0.5 }}
-          >
-            {times.map((t) => (
-              <option key={t} value={t}>{t}</option>
-            ))}
-          </select>
-        </div>
-      ))}
+    <div className="flex flex-col gap-2">
+      {days.map((d) => {
+        const id = `${idPrefix}-${d}`;
+        return (
+          <div key={d} className="flex items-center gap-2 text-sm">
+            <div className="flex w-12 items-center gap-2">
+              <Checkbox
+                id={id}
+                checked={values[d].enabled}
+                onCheckedChange={(checked) =>
+                  onChange({ ...values, [d]: { ...values[d], enabled: checked === true } })
+                }
+              />
+              <Label htmlFor={id} className="text-sm font-normal">{d}</Label>
+            </div>
+            <Select
+              value={values[d].time}
+              disabled={!values[d].enabled}
+              onValueChange={(v) => onChange({ ...values, [d]: { ...values[d], time: String(v) } })}
+            >
+              <SelectTrigger size="sm" className="w-28">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {times.map((t) => (
+                  <SelectItem key={t} value={t}>{t}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        );
+      })}
     </div>
   );
 }
