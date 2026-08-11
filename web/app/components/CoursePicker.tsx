@@ -15,7 +15,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { X } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Search, X } from "lucide-react";
 
 function samePins(a: SectionLock, b: SectionLock) {
   return a.lecture === b.lecture && a.tutorial === b.tutorial && a.lab === b.lab;
@@ -465,23 +466,15 @@ export function CoursePicker(props: Readonly<{
       <div style={{ marginTop: 14 }}>
         <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 6 }}>Search and add courses</div>
         <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            border: "1px solid var(--border)",
-            borderRadius: 10,
-            padding: "8px 10px",
-            background: indexReady ? "var(--surface)" : "var(--surface-3)",
-          }}
+          className={`flex items-center gap-2 rounded-xl border border-border px-3 py-2 ${indexReady ? "bg-card" : "bg-muted"}`}
         >
-          <span style={{ fontSize: 14, color: "var(--text-muted)" }}>🔎</span>
-          <input
+          <Search className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+          <Input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder='Type a course code or title (e.g. "FINA 2303", "econometrics")'
             disabled={!indexReady}
-            style={{ border: "none", outline: "none", width: "100%", background: "transparent" }}
+            className="h-auto border-0 bg-transparent p-0 shadow-none focus-visible:border-0 focus-visible:ring-0"
           />
         </div>
         <div style={{ marginTop: 6, fontSize: 12, color: "var(--text-subtle)" }}>

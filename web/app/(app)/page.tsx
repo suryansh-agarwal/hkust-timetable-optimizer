@@ -20,6 +20,7 @@ import {
 import { Info, MessageSquare, X } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -993,17 +994,12 @@ export default function Home() {
                       fontSize: 13,
                     }}
                   >
-                    <input
+                    <Input
                       type="text"
                       value={p.name}
                       onChange={(e) => renamePin(p.id, e.target.value)}
-                      style={{
-                        border: "none",
-                        background: "transparent",
-                        fontWeight: 600,
-                        width: 140,
-                        fontSize: 13,
-                      }}
+                      aria-label={`Rename ${p.name}`}
+                      className="h-auto w-36 border-0 bg-transparent p-0 text-sm font-semibold shadow-none focus-visible:ring-0"
                     />
                     <span style={{ fontSize: 12, color: "var(--text-subtle)" }}>{p.score.toFixed(1)}</span>
                     <Button
