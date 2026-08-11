@@ -5,6 +5,16 @@ import { loadCourseIndex, searchCourseIndex, getIndexCacheStatus, getCourseFromI
 import type { CourseSections, SectionLock } from "@/lib/api";
 import { optionsFor, reconcilePins, matchingAppliesTo } from "@/lib/sectionOptions";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { X } from "lucide-react";
 
 function samePins(a: SectionLock, b: SectionLock) {
@@ -16,6 +26,12 @@ function summarise(s: { meetings: { day: string; start: string; end: string }[] 
   const days = s.meetings.map((m) => m.day).join("/");
   return `${days} ${s.meetings[0].start}`;
 }
+
+// Base UI treats value="" as "nothing selected" (SelectRoot.js:185), which
+// would make "Any" unselectable and show the placeholder in its place. Carry a
+// sentinel through the control and map it back to "" at the state boundary:
+// "" is what setPin, setLock and the /optimize/ranked payload all expect.
+const ANY = "__any";
 
 export function CoursePicker(props: Readonly<{
   term: string;
@@ -289,25 +305,40 @@ export function CoursePicker(props: Readonly<{
                       // rather than let instructor locking silently
                       // disappear because of an unrelated fetch failure.
                       return instructors.length > 0 ? (
-                        <select
-                          value={locks[code] ?? ""}
+                        <Select
+                          value={locks[code] || ANY}
                           disabled={onlyOne}
-                          onChange={(e) => setLock(code, e.target.value)}
-                          aria-label={`Professor for ${code}`}
-                          title={onlyOne ? "Only one instructor teaches this course" : "Only use sections taught by this professor"}
-                          style={{ padding: 4, fontSize: 12, borderRadius: 6, maxWidth: 220 }}
+                          onValueChange={(v) => setLock(code, v === ANY ? "" : String(v))}
+                          items={
+                            onlyOne
+                              ? [{ value: ANY, label: instructors[0] }]
+                              : [
+                                  { value: ANY, label: "Any professor" },
+                                  ...instructors.map((n) => ({ value: n, label: n })),
+                                ]
+                          }
                         >
-                          {onlyOne ? (
-                            <option value="">{instructors[0]}</option>
-                          ) : (
-                            <>
-                              <option value="">Any professor</option>
-                              {instructors.map((name) => (
-                                <option key={name} value={name}>{name}</option>
-                              ))}
-                            </>
-                          )}
-                        </select>
+                          <SelectTrigger
+                            size="sm"
+                            className="max-w-56"
+                            aria-label={`Professor for ${code}`}
+                            title={onlyOne ? "Only one instructor teaches this course" : "Only use sections taught by this professor"}
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {onlyOne ? (
+                              <SelectItem value={ANY}>{instructors[0]}</SelectItem>
+                            ) : (
+                              <>
+                                <SelectItem value={ANY}>Any professor</SelectItem>
+                                {instructors.map((name) => (
+                                  <SelectItem key={name} value={name}>{name}</SelectItem>
+                                ))}
+                              </>
+                            )}
+                          </SelectContent>
+                        </Select>
                       ) : null;
                     }
                     return instructors.length > 0 ? (
@@ -319,46 +350,62 @@ export function CoursePicker(props: Readonly<{
                   const rows: ReactNode[] = [];
 
                   if (lectures.length > 0 || instructors.length > 1) {
+                    const profItems = instructors.length > 1
+                      ? [{ items: instructors.map((n) => ({ value: `prof:${n}`, label: n })) }]
+                      : [];
+                    const lecItems = lectures.length > 0
+                      ? [{ items: lectures.map((s) => ({ value: s.section, label: `${s.section} · ${summarise(s)}` })) }]
+                      : [];
+
                     rows.push(
-                      <label key="lec" style={{ display: "flex", flexDirection: "column", gap: 2, fontSize: 11, color: "var(--text-muted)" }}>
-                        Lecture
-                        <select
-                          value={pins.lecture ?? (locks[code] ? `prof:${locks[code]}` : "")}
-                          onChange={(e) => {
-                            const v = e.target.value;
+                      <div key="lec" className="flex flex-col gap-1">
+                        <Label htmlFor={`lec-${code}`} className="text-xs font-normal text-muted-foreground">
+                          Lecture
+                        </Label>
+                        <Select
+                          value={pins.lecture || (locks[code] ? `prof:${locks[code]}` : ANY)}
+                          onValueChange={(value) => {
+                            const v = String(value);
                             if (v.startsWith("prof:")) {
                               setLock(code, v.slice(5));
                               setPin(code, "lecture", "");
                             } else {
                               setLock(code, "");
-                              setPin(code, "lecture", v);
+                              setPin(code, "lecture", v === ANY ? "" : v);
                             }
                           }}
-                          style={{ padding: 4, fontSize: 12, borderRadius: 6, maxWidth: 240 }}
+                          items={[{ items: [{ value: ANY, label: "Any" }] }, ...profItems, ...lecItems]}
                         >
-                          <option value="">Any</option>
-                          {/* Same threshold the prune effect above applies. A
-                              course with one instructor has nothing to choose,
-                              and offering the name anyway made the control
-                              snap back to "Any" the moment it was picked. */}
-                          {instructors.length > 1 && (
-                            <optgroup label="Professor">
-                              {instructors.map((n) => (
-                                <option key={n} value={`prof:${n}`}>{n}</option>
-                              ))}
-                            </optgroup>
-                          )}
-                          {lectures.length > 0 && (
-                            <optgroup label="Lecture">
-                              {lectures.map((s) => (
-                                <option key={s.section} value={s.section}>
-                                  {s.section} · {summarise(s)}
-                                </option>
-                              ))}
-                            </optgroup>
-                          )}
-                        </select>
-                      </label>
+                          <SelectTrigger id={`lec-${code}`} size="sm" className="max-w-60">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={ANY}>Any</SelectItem>
+                            {/* Same threshold the prune effect above applies. A
+                                course with one instructor has nothing to choose,
+                                and offering the name anyway made the control
+                                snap back to "Any" the moment it was picked. */}
+                            {instructors.length > 1 && (
+                              <SelectGroup>
+                                <SelectLabel>Professor</SelectLabel>
+                                {instructors.map((n) => (
+                                  <SelectItem key={n} value={`prof:${n}`}>{n}</SelectItem>
+                                ))}
+                              </SelectGroup>
+                            )}
+                            {lectures.length > 0 && (
+                              <SelectGroup>
+                                <SelectLabel>Lecture</SelectLabel>
+                                {lectures.map((s) => (
+                                  <SelectItem key={s.section} value={s.section}>
+                                    {s.section} · {summarise(s)}
+                                  </SelectItem>
+                                ))}
+                              </SelectGroup>
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     );
                   }
 
@@ -372,23 +419,37 @@ export function CoursePicker(props: Readonly<{
                     if (options.length === 0) continue;
                     const auto = matchingAppliesTo(data, kind) && !!pins.lecture && options.length === 1;
                     rows.push(
-                      <label key={kind} style={{ display: "flex", flexDirection: "column", gap: 2, fontSize: 11, color: "var(--text-muted)" }}>
-                        {kind === "TUT" ? "Tutorial" : "Lab"}
-                        <select
-                          value={pins[key] ?? ""}
+                      <div key={kind} className="flex flex-col gap-1">
+                        <Label htmlFor={`${key}-${code}`} className="text-xs font-normal text-muted-foreground">
+                          {kind === "TUT" ? "Tutorial" : "Lab"}
+                        </Label>
+                        <Select
+                          value={pins[key] || ANY}
                           disabled={auto}
-                          onChange={(e) => setPin(code, key, e.target.value)}
-                          title={auto ? "Determined by the lecture you picked" : undefined}
-                          style={{ padding: 4, fontSize: 12, borderRadius: 6, maxWidth: 240 }}
+                          onValueChange={(v) => setPin(code, key, v === ANY ? "" : String(v))}
+                          items={[
+                            ...(auto ? [] : [{ value: ANY, label: "Any" }]),
+                            ...options.map((s) => ({ value: s.section, label: `${s.section} · ${summarise(s)}` })),
+                          ]}
                         >
-                          {!auto && <option value="">Any</option>}
-                          {options.map((s) => (
-                            <option key={s.section} value={s.section}>
-                              {s.section} · {summarise(s)}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
+                          <SelectTrigger
+                            id={`${key}-${code}`}
+                            size="sm"
+                            className="max-w-60"
+                            title={auto ? "Determined by the lecture you picked" : undefined}
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {!auto && <SelectItem value={ANY}>Any</SelectItem>}
+                            {options.map((s) => (
+                              <SelectItem key={s.section} value={s.section}>
+                                {s.section} · {summarise(s)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     );
                   }
 
