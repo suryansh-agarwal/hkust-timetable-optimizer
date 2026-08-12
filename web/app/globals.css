@@ -41,7 +41,12 @@
   --destructive: oklch(0.6368 0.2078 25.33);
   --destructive-foreground: oklch(0.9838 0.0035 247.86);
   --border: oklch(0.9290 0.0126 255.53);
-  --input: oklch(0.9290 0.0126 255.53);
+  /* Darker than --border, and darker than shadcn's stock value, for the same
+     reason the dark theme's is lighter: --input is the boundary of every
+     control, and stock measures 1.23:1 against white and 1.12:1 against
+     --muted - both under WCAG 1.4.11's 3:1 for UI boundaries. This clears it
+     against both light surfaces: --muted 3.01:1, white 3.30:1. */
+  --input: oklch(0.6450 0.0126 255.53);
   --ring: oklch(0.3233 0.1025 253.89);
 
   --success: oklch(0.5500 0.1400 150.00);

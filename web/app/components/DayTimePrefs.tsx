@@ -36,11 +36,15 @@ export function DayCheckboxGroup({
   onChange: (days: string[]) => void;
 }>) {
   return (
-    <div className="flex flex-wrap gap-3">
+    /* A grid, not flex-wrap: the shadcn checkbox and its Label are wider than
+       the native input they replaced, so five days no longer fit on one
+       flex row and Fr dropped to a second line. Five equal columns keep the
+       row intact and line the days up with the column below. */
+    <div className="grid grid-cols-5 gap-x-1 gap-y-2">
       {days.map((d) => {
         const id = `${idPrefix}-${d}`;
         return (
-          <div key={d} className="flex items-center gap-2">
+          <div key={d} className="flex items-center gap-1.5">
             <Checkbox
               id={id}
               checked={selected.includes(d)}

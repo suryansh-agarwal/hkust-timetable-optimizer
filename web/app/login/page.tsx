@@ -128,7 +128,7 @@ function LoginContent() {
           <Button
             onClick={continueWithGoogle}
             disabled={loadingGoogle}
-            className="w-full"
+            className="h-11 w-full"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>
               <path
@@ -161,13 +161,13 @@ function LoginContent() {
               placeholder="Email address"
               aria-label="Email address"
               required
-              className="w-full"
+              className="h-11 w-full"
             />
             <Button
               type="submit"
               variant="outline"
               disabled={loadingEmail}
-              className="w-full"
+              className="h-11 w-full"
             >
               {loadingEmail ? "Sending..." : "Continue with email"}
             </Button>
