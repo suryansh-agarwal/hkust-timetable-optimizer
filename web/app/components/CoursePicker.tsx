@@ -34,6 +34,17 @@ function summarise(s: { meetings: { day: string; start: string; end: string }[] 
 // "" is what setPin, setLock and the /optimize/ranked payload all expect.
 const ANY = "__any";
 
+/*
+ * SelectContent is `w-(--anchor-width)` with a 144px floor, and Base UI sets
+ * --anchor-width from the trigger - it never widens for its own content. These
+ * three controls are the only ones whose labels are data-driven: a section
+ * reads "L1 \u00b7 Tu/Th 10:30AM" and an instructor entry in the 2610 index runs
+ * up to 111 characters. At the floor those were cut off with no ellipsis, so
+ * let the popup size to its content instead, bounded so a long name wraps the
+ * item rather than the page.
+ */
+const POPUP = "w-auto min-w-(--anchor-width) max-w-80";
+
 export function CoursePicker(props: Readonly<{
   term: string;
   selected: string[];
@@ -321,13 +332,13 @@ export function CoursePicker(props: Readonly<{
                         >
                           <SelectTrigger
                             size="sm"
-                            className="max-w-56"
+                            className="w-full"
                             aria-label={`Professor for ${code}`}
                             title={onlyOne ? "Only one instructor teaches this course" : "Only use sections taught by this professor"}
                           >
                             <SelectValue />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent className={POPUP}>
                             {onlyOne ? (
                               <SelectItem value={ANY}>{instructors[0]}</SelectItem>
                             ) : (
@@ -377,10 +388,10 @@ export function CoursePicker(props: Readonly<{
                           }}
                           items={[{ items: [{ value: ANY, label: "Any" }] }, ...profItems, ...lecItems]}
                         >
-                          <SelectTrigger id={`lec-${code}`} size="sm" className="max-w-60">
+                          <SelectTrigger id={`lec-${code}`} size="sm" className="w-full">
                             <SelectValue />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent className={POPUP}>
                             <SelectItem value={ANY}>Any</SelectItem>
                             {/* Same threshold the prune effect above applies. A
                                 course with one instructor has nothing to choose,
@@ -436,12 +447,12 @@ export function CoursePicker(props: Readonly<{
                           <SelectTrigger
                             id={`${key}-${code}`}
                             size="sm"
-                            className="max-w-60"
+                            className="w-full"
                             title={auto ? "Determined by the lecture you picked" : undefined}
                           >
                             <SelectValue />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent className={POPUP}>
                             {!auto && <SelectItem value={ANY}>Any</SelectItem>}
                             {options.map((s) => (
                               <SelectItem key={s.section} value={s.section}>
