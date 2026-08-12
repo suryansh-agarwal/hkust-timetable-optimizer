@@ -4,6 +4,7 @@ import { Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 function LoginContent() {
   const supabase = createClient();
@@ -153,21 +154,14 @@ function LoginContent() {
             <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
           </div>
           <form onSubmit={continueWithEmail} style={{ display: "grid", gap: 10 }}>
-            <input
+            <Input
               type="email"
               value={emailInput}
               onChange={(event) => setEmailInput(event.target.value)}
               placeholder="Email address"
+              aria-label="Email address"
               required
-              style={{
-                width: "100%",
-                padding: "12px 14px",
-                borderRadius: 12,
-                border: "1px solid var(--border)",
-                fontSize: 14,
-                fontWeight: 500,
-                outline: "none",
-              }}
+              className="w-full"
             />
             <Button
               type="submit"

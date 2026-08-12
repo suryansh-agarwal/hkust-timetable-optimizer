@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { optimizeRanked, Prefs, SectionLock } from "@/lib/api";
 import { TimetableGrid, CompareTimetableGrid } from "../components/TimetableGrid";
 import { CoursePicker } from "../components/CoursePicker";
+import { DayCheckboxGroup, DayTimeGroup, type DayPref } from "../components/DayTimePrefs";
 import { toast } from "sonner";
 import { ThemeToggle } from "@/components/theme-toggle";
 import {
@@ -18,6 +19,16 @@ import {
 } from "@/components/ui/dialog";
 import { Info, MessageSquare, X } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 
 const DAYS = ["Mo", "Tu", "We", "Th", "Fr"] as const;
@@ -28,6 +39,12 @@ const TERM_OPTIONS = [
 ] as const;
 
 const DEFAULT_TERM = "2610";
+
+// Base UI treats value="" as "nothing selected" (SelectRoot.js:185), so the
+// "(select)" item would be unselectable and the trigger would fall back to the
+// placeholder. Carry a sentinel through the control and map it back to "" at
+// the state boundary, because compareA/compareB feed the compare view as "".
+const NO_SELECTION = "__none";
 
 // Time options for soft no-after (12:00–20:00 in 30-min steps)
 function genNoAfterTimes(): string[] {
@@ -109,9 +126,6 @@ const GAP_WEIGHTS = { Low: 0.05, Med: 0.10, High: 0.20 } as const;
 const EARLY_LATE_WEIGHTS = { Low: 0.25, Med: 0.50, High: 1.00 } as const;
 type WeightPreset = "Low" | "Med" | "High";
 type GapShape = "no_preference" | "consolidated" | "fragmented";
-
-// Per-day soft constraint state
-type SoftDayPref = { enabled: boolean; time: string };
 
 function minutesToTime(m: number) {
   const hh = Math.floor(m / 60).toString().padStart(2, "0");
@@ -346,29 +360,29 @@ export default function Home() {
   const [softFreeDays, setSoftFreeDays] = useState<string[]>([]);
 
   // Per-day hard no-after constraints
-  const [hardNoAfter, setHardNoAfter] = useState<Record<string, SoftDayPref>>(() => {
-    const init: Record<string, SoftDayPref> = {};
+  const [hardNoAfter, setHardNoAfter] = useState<Record<string, DayPref>>(() => {
+    const init: Record<string, DayPref> = {};
     for (const d of DAYS) init[d] = { enabled: false, time: "15:00" };
     return init;
   });
 
   // Per-day hard no-before constraints
-  const [hardNoBefore, setHardNoBefore] = useState<Record<string, SoftDayPref>>(() => {
-    const init: Record<string, SoftDayPref> = {};
+  const [hardNoBefore, setHardNoBefore] = useState<Record<string, DayPref>>(() => {
+    const init: Record<string, DayPref> = {};
     for (const d of DAYS) init[d] = { enabled: false, time: "09:00" };
     return init;
   });
 
   // Per-day soft no-after constraints
-  const [softNoAfter, setSoftNoAfter] = useState<Record<string, SoftDayPref>>(() => {
-    const init: Record<string, SoftDayPref> = {};
+  const [softNoAfter, setSoftNoAfter] = useState<Record<string, DayPref>>(() => {
+    const init: Record<string, DayPref> = {};
     for (const d of DAYS) init[d] = { enabled: false, time: "15:00" };
     return init;
   });
 
   // Per-day soft no-before constraints
-  const [softNoBefore, setSoftNoBefore] = useState<Record<string, SoftDayPref>>(() => {
-    const init: Record<string, SoftDayPref> = {};
+  const [softNoBefore, setSoftNoBefore] = useState<Record<string, DayPref>>(() => {
+    const init: Record<string, DayPref> = {};
     for (const d of DAYS) init[d] = { enabled: false, time: "09:00" };
     return init;
   });
@@ -567,22 +581,22 @@ export default function Home() {
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
         <div style={{ border: "1px solid var(--border)", borderRadius: 12, padding: 14 }}>
-          <div style={{ marginBottom: 10 }}>
-            <label htmlFor="term-select" style={{ display: "block", fontSize: 14, marginBottom: 6 }}>
-              Term
-            </label>
-            <select
-              id="term-select"
+          <div className="mb-3">
+            <Label htmlFor="term-select" className="mb-2 block text-sm">Term</Label>
+            <Select
               value={term}
-              onChange={(e) => handleTermChange(e.target.value)}
-              style={{ padding: 8, width: "100%" }}
+              onValueChange={(v) => handleTermChange(String(v))}
+              items={TERM_OPTIONS as unknown as { value: string; label: string }[]}
             >
-              {TERM_OPTIONS.map((t) => (
-                <option key={t.value} value={t.value}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger id="term-select" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {TERM_OPTIONS.map((t) => (
+                  <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <CoursePicker
@@ -633,90 +647,36 @@ export default function Home() {
               {/* Hard Free Days (multi-select) */}
               <div>
                 <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Must be free</div>
-                <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                  {DAYS.map((d) => (
-                    <label key={d} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13 }}>
-                      <input
-                        type="checkbox"
-                        checked={hardFreeDays.includes(d)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setHardFreeDays([...hardFreeDays, d]);
-                          } else {
-                            setHardFreeDays(hardFreeDays.filter((x) => x !== d));
-                          }
-                        }}
-                      />
-                      {d}
-                    </label>
-                  ))}
-                </div>
+                <DayCheckboxGroup
+                  idPrefix="hard-free"
+                  days={DAYS}
+                  selected={hardFreeDays}
+                  onChange={setHardFreeDays}
+                />
               </div>
 
               {/* Hard No Classes After */}
               <div style={{ marginTop: 14 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>No classes after</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {DAYS.map((d) => (
-                    <div key={d} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-                      <label style={{ display: "flex", alignItems: "center", gap: 4, width: 50 }}>
-                        <input
-                          type="checkbox"
-                          checked={hardNoAfter[d].enabled}
-                          onChange={(e) =>
-                            setHardNoAfter({ ...hardNoAfter, [d]: { ...hardNoAfter[d], enabled: e.target.checked } })
-                          }
-                        />
-                        {d}
-                      </label>
-                      <select
-                        value={hardNoAfter[d].time}
-                        disabled={!hardNoAfter[d].enabled}
-                        onChange={(e) =>
-                          setHardNoAfter({ ...hardNoAfter, [d]: { ...hardNoAfter[d], time: e.target.value } })
-                        }
-                        style={{ padding: 4, fontSize: 12, borderRadius: 4, opacity: hardNoAfter[d].enabled ? 1 : 0.5 }}
-                      >
-                        {NO_AFTER_TIMES.map((t) => (
-                          <option key={t} value={t}>{t}</option>
-                        ))}
-                      </select>
-                    </div>
-                  ))}
-                </div>
+                <DayTimeGroup
+                  idPrefix="hard-after"
+                  days={DAYS}
+                  values={hardNoAfter}
+                  times={NO_AFTER_TIMES}
+                  onChange={setHardNoAfter}
+                />
               </div>
 
               {/* Hard No Classes Before */}
               <div style={{ marginTop: 14 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>No classes before</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {DAYS.map((d) => (
-                    <div key={d} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-                      <label style={{ display: "flex", alignItems: "center", gap: 4, width: 50 }}>
-                        <input
-                          type="checkbox"
-                          checked={hardNoBefore[d].enabled}
-                          onChange={(e) =>
-                            setHardNoBefore({ ...hardNoBefore, [d]: { ...hardNoBefore[d], enabled: e.target.checked } })
-                          }
-                        />
-                        {d}
-                      </label>
-                      <select
-                        value={hardNoBefore[d].time}
-                        disabled={!hardNoBefore[d].enabled}
-                        onChange={(e) =>
-                          setHardNoBefore({ ...hardNoBefore, [d]: { ...hardNoBefore[d], time: e.target.value } })
-                        }
-                        style={{ padding: 4, fontSize: 12, borderRadius: 4, opacity: hardNoBefore[d].enabled ? 1 : 0.5 }}
-                      >
-                        {NO_BEFORE_TIMES.map((t) => (
-                          <option key={t} value={t}>{t}</option>
-                        ))}
-                      </select>
-                    </div>
-                  ))}
-                </div>
+                <DayTimeGroup
+                  idPrefix="hard-before"
+                  days={DAYS}
+                  values={hardNoBefore}
+                  times={NO_BEFORE_TIMES}
+                  onChange={setHardNoBefore}
+                />
               </div>
             </div>
 
@@ -750,90 +710,36 @@ export default function Home() {
               {/* Soft Free Days (multi-select) */}
               <div>
                 <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Prefer free</div>
-                <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                  {DAYS.map((d) => (
-                    <label key={d} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13 }}>
-                      <input
-                        type="checkbox"
-                        checked={softFreeDays.includes(d)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSoftFreeDays([...softFreeDays, d]);
-                          } else {
-                            setSoftFreeDays(softFreeDays.filter((x) => x !== d));
-                          }
-                        }}
-                      />
-                      {d}
-                    </label>
-                  ))}
-                </div>
+                <DayCheckboxGroup
+                  idPrefix="soft-free"
+                  days={DAYS}
+                  selected={softFreeDays}
+                  onChange={setSoftFreeDays}
+                />
               </div>
 
               {/* Soft No Classes After */}
               <div style={{ marginTop: 14 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>No classes after</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {DAYS.map((d) => (
-                    <div key={d} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-                      <label style={{ display: "flex", alignItems: "center", gap: 4, width: 50 }}>
-                        <input
-                          type="checkbox"
-                          checked={softNoAfter[d].enabled}
-                          onChange={(e) =>
-                            setSoftNoAfter({ ...softNoAfter, [d]: { ...softNoAfter[d], enabled: e.target.checked } })
-                          }
-                        />
-                        {d}
-                      </label>
-                      <select
-                        value={softNoAfter[d].time}
-                        disabled={!softNoAfter[d].enabled}
-                        onChange={(e) =>
-                          setSoftNoAfter({ ...softNoAfter, [d]: { ...softNoAfter[d], time: e.target.value } })
-                        }
-                        style={{ padding: 4, fontSize: 12, borderRadius: 4, opacity: softNoAfter[d].enabled ? 1 : 0.5 }}
-                      >
-                        {NO_AFTER_TIMES.map((t) => (
-                          <option key={t} value={t}>{t}</option>
-                        ))}
-                      </select>
-                    </div>
-                  ))}
-                </div>
+                <DayTimeGroup
+                  idPrefix="soft-after"
+                  days={DAYS}
+                  values={softNoAfter}
+                  times={NO_AFTER_TIMES}
+                  onChange={setSoftNoAfter}
+                />
               </div>
 
               {/* Soft No Classes Before */}
               <div style={{ marginTop: 14 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>No classes before</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {DAYS.map((d) => (
-                    <div key={d} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-                      <label style={{ display: "flex", alignItems: "center", gap: 4, width: 50 }}>
-                        <input
-                          type="checkbox"
-                          checked={softNoBefore[d].enabled}
-                          onChange={(e) =>
-                            setSoftNoBefore({ ...softNoBefore, [d]: { ...softNoBefore[d], enabled: e.target.checked } })
-                          }
-                        />
-                        {d}
-                      </label>
-                      <select
-                        value={softNoBefore[d].time}
-                        disabled={!softNoBefore[d].enabled}
-                        onChange={(e) =>
-                          setSoftNoBefore({ ...softNoBefore, [d]: { ...softNoBefore[d], time: e.target.value } })
-                        }
-                        style={{ padding: 4, fontSize: 12, borderRadius: 4, opacity: softNoBefore[d].enabled ? 1 : 0.5 }}
-                      >
-                        {NO_BEFORE_TIMES.map((t) => (
-                          <option key={t} value={t}>{t}</option>
-                        ))}
-                      </select>
-                    </div>
-                  ))}
-                </div>
+                <DayTimeGroup
+                  idPrefix="soft-before"
+                  days={DAYS}
+                  values={softNoBefore}
+                  times={NO_BEFORE_TIMES}
+                  onChange={setSoftNoBefore}
+                />
               </div>
 
             </div>
@@ -843,49 +749,66 @@ export default function Home() {
           <div style={{ marginTop: 14 }}>
             <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>Weights & style</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text-body)" }}>
-                <span style={{ width: 140 }}>Gap penalty:</span>
-                <select
+              <div className="flex items-center gap-2 text-sm text-foreground">
+                <span className="w-36">Gap penalty:</span>
+                <Select
                   value={gapWeightPreset}
-                  onChange={(e) => setGapWeightPreset(e.target.value as WeightPreset)}
-                  style={{ padding: 6, fontSize: 13, borderRadius: 6 }}
+                  onValueChange={(v) => setGapWeightPreset(v as WeightPreset)}
                 >
-                  <option value="Low">Low</option>
-                  <option value="Med">Med</option>
-                  <option value="High">High</option>
-                </select>
+                  <SelectTrigger size="sm" className="w-28"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Low">Low</SelectItem>
+                    <SelectItem value="Med">Med</SelectItem>
+                    <SelectItem value="High">High</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text-body)" }}>
-                <span style={{ width: 140 }}>Early/late penalty:</span>
-                <select
+              <div className="flex items-center gap-2 text-sm text-foreground">
+                <span className="w-36">Early/late penalty:</span>
+                <Select
                   value={earlyLateWeightPreset}
-                  onChange={(e) => setEarlyLateWeightPreset(e.target.value as WeightPreset)}
-                  style={{ padding: 6, fontSize: 13, borderRadius: 6 }}
+                  onValueChange={(v) => setEarlyLateWeightPreset(v as WeightPreset)}
                 >
-                  <option value="Low">Low</option>
-                  <option value="Med">Med</option>
-                  <option value="High">High</option>
-                </select>
+                  <SelectTrigger size="sm" className="w-28"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Low">Low</SelectItem>
+                    <SelectItem value="Med">Med</SelectItem>
+                    <SelectItem value="High">High</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text-body)" }}>
-                <span style={{ width: 140 }}>Gap shape:</span>
-                <select
+              <div className="flex items-center gap-2 text-sm text-foreground">
+                <span className="w-36">Gap shape:</span>
+                <Select
                   value={gapShape}
-                  onChange={(e) => setGapShape(e.target.value as GapShape)}
-                  style={{ padding: 6, fontSize: 13, borderRadius: 6 }}
+                  onValueChange={(v) => setGapShape(v as GapShape)}
+                  items={[
+                    { value: "no_preference", label: "No preference" },
+                    { value: "consolidated", label: "Prefer one long gap" },
+                    { value: "fragmented", label: "Prefer several short gaps" },
+                  ]}
                 >
-                  <option value="no_preference">No preference</option>
-                  <option value="consolidated">Prefer one long gap</option>
-                  <option value="fragmented">Prefer several short gaps</option>
-                </select>
+                  <SelectTrigger size="sm" className="w-56"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="no_preference">No preference</SelectItem>
+                    <SelectItem value="consolidated">Prefer one long gap</SelectItem>
+                    <SelectItem value="fragmented">Prefer several short gaps</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10, fontSize: 13, color: "var(--text-body)" }}>
-              <label style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                <input type="checkbox" checked={preferOneFreeDay} onChange={(e) => setPreferOneFreeDay(e.target.checked)} />
-                Prefer at least one free weekday
-              </label>
+            <div className="mt-3 flex flex-col gap-2 text-sm text-foreground">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="prefer-one-free-day"
+                  checked={preferOneFreeDay}
+                  onCheckedChange={(checked) => setPreferOneFreeDay(checked === true)}
+                />
+                <Label htmlFor="prefer-one-free-day" className="font-normal">
+                  Prefer at least one free weekday
+                </Label>
+              </div>
             </div>
           </div>
 
@@ -1071,17 +994,12 @@ export default function Home() {
                       fontSize: 13,
                     }}
                   >
-                    <input
+                    <Input
                       type="text"
                       value={p.name}
                       onChange={(e) => renamePin(p.id, e.target.value)}
-                      style={{
-                        border: "none",
-                        background: "transparent",
-                        fontWeight: 600,
-                        width: 140,
-                        fontSize: 13,
-                      }}
+                      aria-label={`Rename ${p.name}`}
+                      className="h-auto w-36 border-0 bg-transparent p-0 text-sm font-semibold shadow-none focus-visible:ring-0"
                     />
                     <span style={{ fontSize: 12, color: "var(--text-subtle)" }}>{p.score.toFixed(1)}</span>
                     <Button
@@ -1112,18 +1030,23 @@ export default function Home() {
                       border: "1px solid hsl(var(--cmp-a) / 0.6)",
                     }}
                   />
-                  <label htmlFor="compare-a" style={{ fontSize: 13, fontWeight: 600 }}>Option A:</label>
-                  <select
-                    id="compare-a"
-                    value={compareA}
-                    onChange={(e) => setCompareA(e.target.value)}
-                    style={{ padding: 6, fontSize: 13, borderRadius: 6 }}
+                  <Label htmlFor="compare-a" className="text-sm font-semibold">Option A:</Label>
+                  <Select
+                    value={compareA || NO_SELECTION}
+                    onValueChange={(v) => setCompareA(v === NO_SELECTION ? "" : String(v))}
+                    items={[
+                      { value: NO_SELECTION, label: "(select)" },
+                      ...pinned.map((p) => ({ value: p.id, label: p.name })),
+                    ]}
                   >
-                    <option value="">(select)</option>
-                    {pinned.map((p) => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
-                    ))}
-                  </select>
+                    <SelectTrigger id="compare-a" size="sm" className="w-48"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NO_SELECTION}>(select)</SelectItem>
+                      {pinned.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <span
@@ -1136,18 +1059,23 @@ export default function Home() {
                       border: "1px solid hsl(var(--cmp-b) / 0.6)",
                     }}
                   />
-                  <label htmlFor="compare-b" style={{ fontSize: 13, fontWeight: 600 }}>Option B:</label>
-                  <select
-                    id="compare-b"
-                    value={compareB}
-                    onChange={(e) => setCompareB(e.target.value)}
-                    style={{ padding: 6, fontSize: 13, borderRadius: 6 }}
+                  <Label htmlFor="compare-b" className="text-sm font-semibold">Option B:</Label>
+                  <Select
+                    value={compareB || NO_SELECTION}
+                    onValueChange={(v) => setCompareB(v === NO_SELECTION ? "" : String(v))}
+                    items={[
+                      { value: NO_SELECTION, label: "(select)" },
+                      ...pinned.map((p) => ({ value: p.id, label: p.name })),
+                    ]}
                   >
-                    <option value="">(select)</option>
-                    {pinned.map((p) => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
-                    ))}
-                  </select>
+                    <SelectTrigger id="compare-b" size="sm" className="w-48"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NO_SELECTION}>(select)</SelectItem>
+                      {pinned.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             )}

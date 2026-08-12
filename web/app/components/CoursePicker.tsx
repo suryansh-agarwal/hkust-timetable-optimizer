@@ -5,7 +5,18 @@ import { loadCourseIndex, searchCourseIndex, getIndexCacheStatus, getCourseFromI
 import type { CourseSections, SectionLock } from "@/lib/api";
 import { optionsFor, reconcilePins, matchingAppliesTo } from "@/lib/sectionOptions";
 import { Button } from "@/components/ui/button";
-import { X } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Search, X } from "lucide-react";
 
 function samePins(a: SectionLock, b: SectionLock) {
   return a.lecture === b.lecture && a.tutorial === b.tutorial && a.lab === b.lab;
@@ -16,6 +27,23 @@ function summarise(s: { meetings: { day: string; start: string; end: string }[] 
   const days = s.meetings.map((m) => m.day).join("/");
   return `${days} ${s.meetings[0].start}`;
 }
+
+// Base UI treats value="" as "nothing selected" (SelectRoot.js:185), which
+// would make "Any" unselectable and show the placeholder in its place. Carry a
+// sentinel through the control and map it back to "" at the state boundary:
+// "" is what setPin, setLock and the /optimize/ranked payload all expect.
+const ANY = "__any";
+
+/*
+ * SelectContent is `w-(--anchor-width)` with a 144px floor, and Base UI sets
+ * --anchor-width from the trigger - it never widens for its own content. These
+ * three controls are the only ones whose labels are data-driven: a section
+ * reads "L1 \u00b7 Tu/Th 10:30AM" and an instructor entry in the 2610 index runs
+ * up to 111 characters. At the floor those were cut off with no ellipsis, so
+ * let the popup size to its content instead, bounded so a long name wraps the
+ * item rather than the page.
+ */
+const POPUP = "w-auto min-w-(--anchor-width) max-w-80";
 
 export function CoursePicker(props: Readonly<{
   term: string;
@@ -289,25 +317,40 @@ export function CoursePicker(props: Readonly<{
                       // rather than let instructor locking silently
                       // disappear because of an unrelated fetch failure.
                       return instructors.length > 0 ? (
-                        <select
-                          value={locks[code] ?? ""}
+                        <Select
+                          value={locks[code] || ANY}
                           disabled={onlyOne}
-                          onChange={(e) => setLock(code, e.target.value)}
-                          aria-label={`Professor for ${code}`}
-                          title={onlyOne ? "Only one instructor teaches this course" : "Only use sections taught by this professor"}
-                          style={{ padding: 4, fontSize: 12, borderRadius: 6, maxWidth: 220 }}
+                          onValueChange={(v) => setLock(code, v === ANY ? "" : String(v))}
+                          items={
+                            onlyOne
+                              ? [{ value: ANY, label: instructors[0] }]
+                              : [
+                                  { value: ANY, label: "Any professor" },
+                                  ...instructors.map((n) => ({ value: n, label: n })),
+                                ]
+                          }
                         >
-                          {onlyOne ? (
-                            <option value="">{instructors[0]}</option>
-                          ) : (
-                            <>
-                              <option value="">Any professor</option>
-                              {instructors.map((name) => (
-                                <option key={name} value={name}>{name}</option>
-                              ))}
-                            </>
-                          )}
-                        </select>
+                          <SelectTrigger
+                            size="sm"
+                            className="w-full"
+                            aria-label={`Professor for ${code}`}
+                            title={onlyOne ? "Only one instructor teaches this course" : "Only use sections taught by this professor"}
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className={POPUP}>
+                            {onlyOne ? (
+                              <SelectItem value={ANY}>{instructors[0]}</SelectItem>
+                            ) : (
+                              <>
+                                <SelectItem value={ANY}>Any professor</SelectItem>
+                                {instructors.map((name) => (
+                                  <SelectItem key={name} value={name}>{name}</SelectItem>
+                                ))}
+                              </>
+                            )}
+                          </SelectContent>
+                        </Select>
                       ) : null;
                     }
                     return instructors.length > 0 ? (
@@ -316,49 +359,73 @@ export function CoursePicker(props: Readonly<{
                   }
 
                   const lectures = optionsFor(data, "LEC");
+                  // Course codes carry a space ("ACCT 2200"), which is invalid in an id
+                  // attribute - getElementById copes, querySelector throws.
+                  const idBase = code.replaceAll(" ", "-");
                   const rows: ReactNode[] = [];
 
                   if (lectures.length > 0 || instructors.length > 1) {
+                    const profItems = instructors.length > 1
+                      ? [{ items: instructors.map((n) => ({ value: `prof:${n}`, label: n })) }]
+                      : [];
+                    const lecItems = lectures.length > 0
+                      ? [{ items: lectures.map((s) => ({ value: s.section, label: `${s.section} · ${summarise(s)}` })) }]
+                      : [];
+
                     rows.push(
-                      <label key="lec" style={{ display: "flex", flexDirection: "column", gap: 2, fontSize: 11, color: "var(--text-muted)" }}>
-                        Lecture
-                        <select
-                          value={pins.lecture ?? (locks[code] ? `prof:${locks[code]}` : "")}
-                          onChange={(e) => {
-                            const v = e.target.value;
+                      <div key="lec" className="flex flex-col gap-1">
+                        <Label htmlFor={`lec-${idBase}`} className="text-xs font-normal text-muted-foreground">
+                          Lecture
+                        </Label>
+                        <Select
+                          value={pins.lecture || (locks[code] ? `prof:${locks[code]}` : ANY)}
+                          onValueChange={(value) => {
+                            const v = String(value);
                             if (v.startsWith("prof:")) {
                               setLock(code, v.slice(5));
                               setPin(code, "lecture", "");
                             } else {
                               setLock(code, "");
-                              setPin(code, "lecture", v);
+                              setPin(code, "lecture", v === ANY ? "" : v);
                             }
                           }}
-                          style={{ padding: 4, fontSize: 12, borderRadius: 6, maxWidth: 240 }}
+                          /* Every entry must be a group: isGroupedItems inspects
+                             items[0] alone, so a flat entry first would make Base UI
+                             read the whole array as flat, find no matches, and fall
+                             back to showing raw values (`prof:CHAN, Tai Man`, `L1`).
+                             That is why "Any" is wrapped in a group of one. */
+                          items={[{ items: [{ value: ANY, label: "Any" }] }, ...profItems, ...lecItems]}
                         >
-                          <option value="">Any</option>
-                          {/* Same threshold the prune effect above applies. A
-                              course with one instructor has nothing to choose,
-                              and offering the name anyway made the control
-                              snap back to "Any" the moment it was picked. */}
-                          {instructors.length > 1 && (
-                            <optgroup label="Professor">
-                              {instructors.map((n) => (
-                                <option key={n} value={`prof:${n}`}>{n}</option>
-                              ))}
-                            </optgroup>
-                          )}
-                          {lectures.length > 0 && (
-                            <optgroup label="Lecture">
-                              {lectures.map((s) => (
-                                <option key={s.section} value={s.section}>
-                                  {s.section} · {summarise(s)}
-                                </option>
-                              ))}
-                            </optgroup>
-                          )}
-                        </select>
-                      </label>
+                          <SelectTrigger id={`lec-${idBase}`} size="sm" className="w-full">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className={POPUP}>
+                            <SelectItem value={ANY}>Any</SelectItem>
+                            {/* Same threshold the prune effect above applies. A
+                                course with one instructor has nothing to choose,
+                                and offering the name anyway made the control
+                                snap back to "Any" the moment it was picked. */}
+                            {instructors.length > 1 && (
+                              <SelectGroup>
+                                <SelectLabel>Professor</SelectLabel>
+                                {instructors.map((n) => (
+                                  <SelectItem key={n} value={`prof:${n}`}>{n}</SelectItem>
+                                ))}
+                              </SelectGroup>
+                            )}
+                            {lectures.length > 0 && (
+                              <SelectGroup>
+                                <SelectLabel>Lecture</SelectLabel>
+                                {lectures.map((s) => (
+                                  <SelectItem key={s.section} value={s.section}>
+                                    {s.section} · {summarise(s)}
+                                  </SelectItem>
+                                ))}
+                              </SelectGroup>
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     );
                   }
 
@@ -372,23 +439,37 @@ export function CoursePicker(props: Readonly<{
                     if (options.length === 0) continue;
                     const auto = matchingAppliesTo(data, kind) && !!pins.lecture && options.length === 1;
                     rows.push(
-                      <label key={kind} style={{ display: "flex", flexDirection: "column", gap: 2, fontSize: 11, color: "var(--text-muted)" }}>
-                        {kind === "TUT" ? "Tutorial" : "Lab"}
-                        <select
-                          value={pins[key] ?? ""}
+                      <div key={kind} className="flex flex-col gap-1">
+                        <Label htmlFor={`${key}-${idBase}`} className="text-xs font-normal text-muted-foreground">
+                          {kind === "TUT" ? "Tutorial" : "Lab"}
+                        </Label>
+                        <Select
+                          value={pins[key] || ANY}
                           disabled={auto}
-                          onChange={(e) => setPin(code, key, e.target.value)}
-                          title={auto ? "Determined by the lecture you picked" : undefined}
-                          style={{ padding: 4, fontSize: 12, borderRadius: 6, maxWidth: 240 }}
+                          onValueChange={(v) => setPin(code, key, v === ANY ? "" : String(v))}
+                          items={[
+                            ...(auto ? [] : [{ value: ANY, label: "Any" }]),
+                            ...options.map((s) => ({ value: s.section, label: `${s.section} · ${summarise(s)}` })),
+                          ]}
                         >
-                          {!auto && <option value="">Any</option>}
-                          {options.map((s) => (
-                            <option key={s.section} value={s.section}>
-                              {s.section} · {summarise(s)}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
+                          <SelectTrigger
+                            id={`${key}-${idBase}`}
+                            size="sm"
+                            className="w-full"
+                            title={auto ? "Determined by the lecture you picked" : undefined}
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className={POPUP}>
+                            {!auto && <SelectItem value={ANY}>Any</SelectItem>}
+                            {options.map((s) => (
+                              <SelectItem key={s.section} value={s.section}>
+                                {s.section} · {summarise(s)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     );
                   }
 
@@ -404,23 +485,15 @@ export function CoursePicker(props: Readonly<{
       <div style={{ marginTop: 14 }}>
         <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 6 }}>Search and add courses</div>
         <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            border: "1px solid var(--border)",
-            borderRadius: 10,
-            padding: "8px 10px",
-            background: indexReady ? "var(--surface)" : "var(--surface-3)",
-          }}
+          className={`flex items-center gap-2 rounded-xl border border-border px-3 py-2 ${indexReady ? "bg-card" : "bg-muted"}`}
         >
-          <span style={{ fontSize: 14, color: "var(--text-muted)" }}>🔎</span>
-          <input
+          <Search className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+          <Input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder='Type a course code or title (e.g. "FINA 2303", "econometrics")'
             disabled={!indexReady}
-            style={{ border: "none", outline: "none", width: "100%", background: "transparent" }}
+            className="h-auto border-0 bg-transparent p-0 shadow-none focus-visible:border-0 focus-visible:ring-0"
           />
         </div>
         <div style={{ marginTop: 6, fontSize: 12, color: "var(--text-subtle)" }}>

@@ -73,13 +73,10 @@
   --cmp-b: 217 91% 55%;
 
   /* --- Legacy aliases. Deleted per-file as later stages migrate. --- */
-  --bg: var(--background);
   --surface: var(--card);
   --surface-2: var(--muted);
-  --surface-3: var(--muted);
   --border-subtle: var(--border);
   --border-faint: var(--border);
-  --text: var(--foreground);
   --text-strong: var(--foreground);
   --text-body: var(--foreground);
   --text-muted: var(--muted-foreground);
@@ -97,13 +94,10 @@
   --danger-chip-bg: color-mix(in oklch, var(--destructive) 8%, var(--background));
   --success-bg: color-mix(in oklch, var(--success) 10%, var(--background));
   --success-border: color-mix(in oklch, var(--success) 30%, var(--background));
-  --pin-bg: color-mix(in oklch, var(--primary) 12%, var(--background));
   /* Defined per theme rather than aliased to --primary: in dark mode the
-     lightened navy against --pin-bg measures 3.58:1, below the 4.5:1 AA
-     threshold for text. */
-  --pin-border: var(--primary);
+     lightened navy needs a further lightened value to hold contrast as
+     plain text on the page background. */
   --pin-text: var(--primary);
-  --selected-bg: color-mix(in oklch, var(--primary) 8%, var(--background));
   --active-border: var(--primary);
 }
 
@@ -129,7 +123,14 @@
   --destructive: oklch(0.6000 0.1900 25.50);
   --destructive-foreground: oklch(0.9838 0.0035 247.86);
   --border: oklch(0.2800 0.0369 259.97);
-  --input: oklch(0.2800 0.0369 259.97);
+  /* Lighter than --border on purpose. --input is the boundary of every
+     control (Checkbox, Input, SelectTrigger), and shadcn's stock value is
+     identical to --muted - which is the hard-preferences panel's
+     background, so on that panel the ten checkboxes and ten select
+     triggers measured 1.00:1 and were invisible. This value clears WCAG
+     1.4.11's 3:1 for UI boundaries against all three dark surfaces:
+     --muted 3.01:1, --card 3.73:1, --background 4.12:1. */
+  --input: oklch(0.5500 0.0369 259.97);
   --ring: oklch(0.8688 0.0198 252.85);
 
   --success: oklch(0.7200 0.1600 150.00);
@@ -155,7 +156,6 @@
   --cmp-a: 0 90% 70%;
   --cmp-b: 217 91% 70%;
 
-  --pin-border: oklch(0.7800 0.1000 251.48);
   --pin-text: oklch(0.7800 0.1000 251.48);
   --danger: oklch(0.70 0.17 25.5);
   --active-border: var(--ring);
@@ -199,44 +199,25 @@ body {
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
 
-/* Native controls inherit the surface they sit on. `button` is deliberately
-   excluded: every button in authored code is now shadcn's Button, which sets
-   its own text colour per variant (e.g. text-primary-foreground) via a
-   Tailwind utility in @layer utilities. This rule lives outside any cascade
-   layer, and unlayered declarations always beat layered ones regardless of
-   specificity — so a `color` here would silently win over the component's
-   utility class on every variant. font-family is dropped too since it only
-   ever mattered for the button case. */
-input,
-select,
-textarea {
-  font-family: inherit;
-  color: var(--foreground);
-}
+/* The native-control rules that used to theme input/select/textarea are
+   gone. Every control in app code is now a shadcn component (Input,
+   Checkbox, Select) carrying its own colour via Tailwind utilities in
+   @layer utilities.
 
-input:not([type="checkbox"]):not([type="radio"]),
-select,
-textarea {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-}
+   Removing them was not merely harmless. Input wraps @base-ui/react's
+   InputPrimitive, which renders a real, visible <input> - so those rules
+   did reach a live element, and because they were UNLAYERED they silently
+   outranked Input's own utility classes (rounded-lg, bg-transparent /
+   dark:bg-input/30, border-input). That is the same mechanism as the
+   stage 2a Critical, where an unlayered `button { color }` beat
+   .text-primary-foreground and blacked out every primary button in the
+   light theme. Tailwind's Preflight reset sits in @layer base, below
+   @layer utilities, so with these rules gone the component's intended
+   styling correctly wins.
 
-input[type="checkbox"],
-input[type="radio"] {
-  accent-color: var(--primary);
-}
-
-input:not([type="checkbox"]):not([type="radio"]):disabled,
-select:disabled,
-textarea:disabled {
-  background: var(--muted);
-  color: var(--muted-foreground);
-}
-
-input::placeholder {
-  color: var(--muted-foreground);
-}
+   Do not reintroduce an unlayered rule for a native element that a shadcn
+   component renders. If a global element rule is genuinely needed, put it
+   in @layer base. */
 
 :focus-visible {
   outline: 2px solid var(--ring);
