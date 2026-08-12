@@ -359,6 +359,9 @@ export function CoursePicker(props: Readonly<{
                   }
 
                   const lectures = optionsFor(data, "LEC");
+                  // Course codes carry a space ("ACCT 2200"), which is invalid in an id
+                  // attribute - getElementById copes, querySelector throws.
+                  const idBase = code.replaceAll(" ", "-");
                   const rows: ReactNode[] = [];
 
                   if (lectures.length > 0 || instructors.length > 1) {
@@ -371,7 +374,7 @@ export function CoursePicker(props: Readonly<{
 
                     rows.push(
                       <div key="lec" className="flex flex-col gap-1">
-                        <Label htmlFor={`lec-${code}`} className="text-xs font-normal text-muted-foreground">
+                        <Label htmlFor={`lec-${idBase}`} className="text-xs font-normal text-muted-foreground">
                           Lecture
                         </Label>
                         <Select
@@ -386,9 +389,14 @@ export function CoursePicker(props: Readonly<{
                               setPin(code, "lecture", v === ANY ? "" : v);
                             }
                           }}
+                          /* Every entry must be a group: isGroupedItems inspects
+                             items[0] alone, so a flat entry first would make Base UI
+                             read the whole array as flat, find no matches, and fall
+                             back to showing raw values (`prof:CHAN, Tai Man`, `L1`).
+                             That is why "Any" is wrapped in a group of one. */
                           items={[{ items: [{ value: ANY, label: "Any" }] }, ...profItems, ...lecItems]}
                         >
-                          <SelectTrigger id={`lec-${code}`} size="sm" className="w-full">
+                          <SelectTrigger id={`lec-${idBase}`} size="sm" className="w-full">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent className={POPUP}>
@@ -432,7 +440,7 @@ export function CoursePicker(props: Readonly<{
                     const auto = matchingAppliesTo(data, kind) && !!pins.lecture && options.length === 1;
                     rows.push(
                       <div key={kind} className="flex flex-col gap-1">
-                        <Label htmlFor={`${key}-${code}`} className="text-xs font-normal text-muted-foreground">
+                        <Label htmlFor={`${key}-${idBase}`} className="text-xs font-normal text-muted-foreground">
                           {kind === "TUT" ? "Tutorial" : "Lab"}
                         </Label>
                         <Select
@@ -445,7 +453,7 @@ export function CoursePicker(props: Readonly<{
                           ]}
                         >
                           <SelectTrigger
-                            id={`${key}-${code}`}
+                            id={`${key}-${idBase}`}
                             size="sm"
                             className="w-full"
                             title={auto ? "Determined by the lecture you picked" : undefined}
