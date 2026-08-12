@@ -73,12 +73,10 @@
   --cmp-b: 217 91% 55%;
 
   /* --- Legacy aliases. Deleted per-file as later stages migrate. --- */
-  --bg: var(--background);
   --surface: var(--card);
   --surface-2: var(--muted);
   --border-subtle: var(--border);
   --border-faint: var(--border);
-  --text: var(--foreground);
   --text-strong: var(--foreground);
   --text-body: var(--foreground);
   --text-muted: var(--muted-foreground);
@@ -125,7 +123,14 @@
   --destructive: oklch(0.6000 0.1900 25.50);
   --destructive-foreground: oklch(0.9838 0.0035 247.86);
   --border: oklch(0.2800 0.0369 259.97);
-  --input: oklch(0.2800 0.0369 259.97);
+  /* Lighter than --border on purpose. --input is the boundary of every
+     control (Checkbox, Input, SelectTrigger), and shadcn's stock value is
+     identical to --muted - which is the hard-preferences panel's
+     background, so on that panel the ten checkboxes and ten select
+     triggers measured 1.00:1 and were invisible. This value clears WCAG
+     1.4.11's 3:1 for UI boundaries against all three dark surfaces:
+     --muted 3.01:1, --card 3.73:1, --background 4.12:1. */
+  --input: oklch(0.5500 0.0369 259.97);
   --ring: oklch(0.8688 0.0198 252.85);
 
   --success: oklch(0.7200 0.1600 150.00);
@@ -195,13 +200,24 @@ body {
 }
 
 /* The native-control rules that used to theme input/select/textarea are
-   gone: every one in app code is now a shadcn component (Input, Checkbox,
-   Select) that carries its own colour via Tailwind utilities in
-   @layer utilities. The only native elements left are the hidden inputs
-   Base UI renders internally for form semantics, which are not visible, so
-   styling them has no visible effect. Keeping the rule around would only
-   restore the cascade-layer trap: an unlayered `color` here would silently
-   outrank a component's own utility class. */
+   gone. Every control in app code is now a shadcn component (Input,
+   Checkbox, Select) carrying its own colour via Tailwind utilities in
+   @layer utilities.
+
+   Removing them was not merely harmless. Input wraps @base-ui/react's
+   InputPrimitive, which renders a real, visible <input> - so those rules
+   did reach a live element, and because they were UNLAYERED they silently
+   outranked Input's own utility classes (rounded-lg, bg-transparent /
+   dark:bg-input/30, border-input). That is the same mechanism as the
+   stage 2a Critical, where an unlayered `button { color }` beat
+   .text-primary-foreground and blacked out every primary button in the
+   light theme. Tailwind's Preflight reset sits in @layer base, below
+   @layer utilities, so with these rules gone the component's intended
+   styling correctly wins.
+
+   Do not reintroduce an unlayered rule for a native element that a shadcn
+   component renders. If a global element rule is genuinely needed, put it
+   in @layer base. */
 
 :focus-visible {
   outline: 2px solid var(--ring);
