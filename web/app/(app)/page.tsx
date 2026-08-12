@@ -18,6 +18,7 @@ import {
 } from "@/lib/schedule";
 import { TimetableGrid, CompareTimetableGrid } from "../components/TimetableGrid";
 import { CoursePicker } from "../components/CoursePicker";
+import { Header } from "../components/Header";
 import { DayCheckboxGroup, DayTimeGroup } from "../components/DayTimePrefs";
 import {
   DAYS,
@@ -32,7 +33,6 @@ import {
   type GapShape,
 } from "../components/usePreferences";
 import { toast } from "sonner";
-import { ThemeToggle } from "@/components/theme-toggle";
 import {
   Dialog,
   DialogContent,
@@ -41,8 +41,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Info, MessageSquare, X } from "lucide-react";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Info, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -336,38 +336,13 @@ export default function Home() {
   
   return (
     <div style={{ maxWidth: 1200, margin: "0 auto", padding: "20px 24px", fontFamily: "system-ui", width: "100%" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-        <div>
-          <h1 style={{ fontSize: 28, fontWeight: 700, margin: 0 }}>HKUST Timetable Optimizer</h1>
-          <div style={{ marginTop: 4, fontSize: 13, color: "var(--text-muted)" }}>
-            Build a schedule with soft and hard preferences
-          </div>
-          <div><b>Logged in as:</b> {email}</div>
-        </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <ThemeToggle />
-          <a
-            href="https://docs.google.com/forms/d/e/1FAIpQLSdUPWeLVqBYbBbZunz-tPnI3mvgGDgKN2onmYPKlZ13OcwNUA/viewform?usp=publish-editor"
-            target="_blank"
-            rel="noreferrer"
-            aria-label="Leave feedback"
-            className={buttonVariants({ variant: "outline", size: "sm" })}
-          >
-            <MessageSquare className="size-4" aria-hidden />
-            Feedback
-          </a>
-          <Button variant="outline" size="sm" onClick={() => setShowHelp(true)}>
-            How to use?
-          </Button>
-          <Button
-            size="sm"
-            onClick={runOptimize}
-            disabled={loading || selectedCourses.length === 0}
-          >
-            {loading ? "Optimizing..." : "Optimize"}
-          </Button>
-        </div>
-      </div>
+      <Header
+        email={email}
+        loading={loading}
+        optimizeDisabled={loading || selectedCourses.length === 0}
+        onShowHelp={() => setShowHelp(true)}
+        onOptimize={runOptimize}
+      />
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
         <div style={{ border: "1px solid var(--border)", borderRadius: 12, padding: 14 }}>
           <div className="mb-3">
