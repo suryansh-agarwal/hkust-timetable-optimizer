@@ -18,7 +18,19 @@ import {
 } from "@/lib/schedule";
 import { TimetableGrid, CompareTimetableGrid } from "../components/TimetableGrid";
 import { CoursePicker } from "../components/CoursePicker";
-import { DayCheckboxGroup, DayTimeGroup, type DayPref } from "../components/DayTimePrefs";
+import { DayCheckboxGroup, DayTimeGroup } from "../components/DayTimePrefs";
+import {
+  DAYS,
+  GAP_WEIGHTS,
+  EARLY_LATE_WEIGHTS,
+  NO_AFTER_TIMES,
+  NO_BEFORE_TIMES,
+  validateTimeConstraints,
+  useDayPrefs,
+  useWeightPrefs,
+  type WeightPreset,
+  type GapShape,
+} from "../components/usePreferences";
 import { toast } from "sonner";
 import { ThemeToggle } from "@/components/theme-toggle";
 import {
@@ -43,7 +55,6 @@ import {
 } from "@/components/ui/select";
 
 
-const DAYS = ["Mo", "Tu", "We", "Th", "Fr"] as const;
 const TERM_OPTIONS = [
   { value: "2610", label: "2026 Fall" },
   { value: "2540", label: "2026 Summer" },
@@ -57,87 +68,6 @@ const DEFAULT_TERM = "2610";
 // placeholder. Carry a sentinel through the control and map it back to "" at
 // the state boundary, because compareA/compareB feed the compare view as "".
 const NO_SELECTION = "__none";
-
-// Time options for soft no-after (12:00–20:00 in 30-min steps)
-function genNoAfterTimes(): string[] {
-  const times: string[] = [];
-  for (let h = 12; h <= 20; h++) {
-    times.push(`${h.toString().padStart(2, "0")}:00`);
-    if (h < 20) times.push(`${h.toString().padStart(2, "0")}:30`);
-  }
-  return times;
-}
-
-// Time options for soft no-before (09:00–15:00 in 30-min steps)
-function genNoBeforeTimes(): string[] {
-  const times: string[] = [];
-  for (let h = 9; h <= 15; h++) {
-    times.push(`${h.toString().padStart(2, "0")}:00`);
-    if (h < 15) times.push(`${h.toString().padStart(2, "0")}:30`);
-  }
-  return times;
-}
-
-// Convert "HH:MM" to minutes since midnight
-function timeToMinutes(hhmm: string): number {
-  const [h, m] = hhmm.split(":").map(Number);
-  return h * 60 + m;
-}
-
-// Validate that no-before and no-after constraints don't conflict on the same day
-function validateTimeConstraints(
-  hardNoBefore: Record<string, { enabled: boolean; time: string }>,
-  hardNoAfter: Record<string, { enabled: boolean; time: string }>,
-  softNoBefore: Record<string, { enabled: boolean; time: string }>,
-  softNoAfter: Record<string, { enabled: boolean; time: string }>,
-  days: readonly string[]
-): string[] {
-  const conflicts: string[] = [];
-
-  for (const d of days) {
-    // Collect all no-before times for this day (both hard and soft)
-    const noBeforeTimes: { type: string; time: number }[] = [];
-    if (hardNoBefore[d]?.enabled) {
-      noBeforeTimes.push({ type: "hard", time: timeToMinutes(hardNoBefore[d].time) });
-    }
-    if (softNoBefore[d]?.enabled) {
-      noBeforeTimes.push({ type: "soft", time: timeToMinutes(softNoBefore[d].time) });
-    }
-
-    // Collect all no-after times for this day (both hard and soft)
-    const noAfterTimes: { type: string; time: number }[] = [];
-    if (hardNoAfter[d]?.enabled) {
-      noAfterTimes.push({ type: "hard", time: timeToMinutes(hardNoAfter[d].time) });
-    }
-    if (softNoAfter[d]?.enabled) {
-      noAfterTimes.push({ type: "soft", time: timeToMinutes(softNoAfter[d].time) });
-    }
-
-    // Check for conflicts: if no-before >= no-after, it's impossible
-    for (const nb of noBeforeTimes) {
-      for (const na of noAfterTimes) {
-        if (nb.time >= na.time) {
-          const nbTimeStr = hardNoBefore[d]?.enabled && nb.type === "hard" ? hardNoBefore[d].time : softNoBefore[d].time;
-          const naTimeStr = hardNoAfter[d]?.enabled && na.type === "hard" ? hardNoAfter[d].time : softNoAfter[d].time;
-          conflicts.push(
-            `${d}: "no classes before ${nbTimeStr}" (${nb.type}) conflicts with "no classes after ${naTimeStr}" (${na.type})`
-          );
-        }
-      }
-    }
-  }
-
-  return conflicts;
-}
-
-const NO_AFTER_TIMES = genNoAfterTimes();
-const NO_BEFORE_TIMES = genNoBeforeTimes();
-
-// Weight presets
-const GAP_WEIGHTS = { Low: 0.05, Med: 0.10, High: 0.20 } as const;
-const EARLY_LATE_WEIGHTS = { Low: 0.25, Med: 0.50, High: 1.00 } as const;
-type WeightPreset = "Low" | "Med" | "High";
-type GapShape = "no_preference" | "consolidated" | "fragmented";
 
 export default function Home() {
   const supabase = useMemo(() => createClient(), []);
@@ -249,44 +179,9 @@ export default function Home() {
     return () => clearTimeout(handle);
   }, [supabase, userId, term, selectedCourses, instructorLocks, sectionLocks, selectionsLoaded]);
 
-  // Hard free days (multi-select)
-  const [hardFreeDays, setHardFreeDays] = useState<string[]>([]);
-  const [softFreeDays, setSoftFreeDays] = useState<string[]>([]);
-
-  // Per-day hard no-after constraints
-  const [hardNoAfter, setHardNoAfter] = useState<Record<string, DayPref>>(() => {
-    const init: Record<string, DayPref> = {};
-    for (const d of DAYS) init[d] = { enabled: false, time: "15:00" };
-    return init;
-  });
-
-  // Per-day hard no-before constraints
-  const [hardNoBefore, setHardNoBefore] = useState<Record<string, DayPref>>(() => {
-    const init: Record<string, DayPref> = {};
-    for (const d of DAYS) init[d] = { enabled: false, time: "09:00" };
-    return init;
-  });
-
-  // Per-day soft no-after constraints
-  const [softNoAfter, setSoftNoAfter] = useState<Record<string, DayPref>>(() => {
-    const init: Record<string, DayPref> = {};
-    for (const d of DAYS) init[d] = { enabled: false, time: "15:00" };
-    return init;
-  });
-
-  // Per-day soft no-before constraints
-  const [softNoBefore, setSoftNoBefore] = useState<Record<string, DayPref>>(() => {
-    const init: Record<string, DayPref> = {};
-    for (const d of DAYS) init[d] = { enabled: false, time: "09:00" };
-    return init;
-  });
-
-  // Weight presets
-  const [gapWeightPreset, setGapWeightPreset] = useState<WeightPreset>("Med");
-  const [earlyLateWeightPreset, setEarlyLateWeightPreset] = useState<WeightPreset>("Med");
-
-  const [preferOneFreeDay, setPreferOneFreeDay] = useState(true);
-  const [gapShape, setGapShape] = useState<GapShape>("no_preference");
+  const hard = useDayPrefs();
+  const soft = useDayPrefs();
+  const weights = useWeightPrefs();
 
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{ results: { score: number; breakdown: { penalties?: unknown[]; bonuses?: unknown[] }; schedule: unknown[] }[]; considered: number; returned: number } | null>(null);
@@ -345,7 +240,7 @@ export default function Home() {
     setDidJustOptimize(false);
 
     // Validate time constraints before running
-    const conflicts = validateTimeConstraints(hardNoBefore, hardNoAfter, softNoBefore, softNoAfter, DAYS);
+    const conflicts = validateTimeConstraints(hard.noBefore, hard.noAfter, soft.noBefore, soft.noAfter, DAYS);
     if (conflicts.length > 0) {
       setError(`Conflicting time preferences detected:\n${conflicts.join("\n")}\n\nPlease adjust your preferences so that "no classes before" times are earlier than "no classes after" times for the same day.`);
       return;
@@ -356,48 +251,48 @@ export default function Home() {
     // Build hard_no_after from enabled days only
     const hardNoAfterPayload: Record<string, string> = {};
     for (const d of DAYS) {
-      if (hardNoAfter[d].enabled) {
-        hardNoAfterPayload[d] = hardNoAfter[d].time;
+      if (hard.noAfter[d].enabled) {
+        hardNoAfterPayload[d] = hard.noAfter[d].time;
       }
     }
 
     // Build hard_no_before from enabled days only
     const hardNoBeforePayload: Record<string, string> = {};
     for (const d of DAYS) {
-      if (hardNoBefore[d].enabled) {
-        hardNoBeforePayload[d] = hardNoBefore[d].time;
+      if (hard.noBefore[d].enabled) {
+        hardNoBeforePayload[d] = hard.noBefore[d].time;
       }
     }
 
     // Build soft_no_after from enabled days only
     const softNoAfterPayload: Record<string, string> = {};
     for (const d of DAYS) {
-      if (softNoAfter[d].enabled) {
-        softNoAfterPayload[d] = softNoAfter[d].time;
+      if (soft.noAfter[d].enabled) {
+        softNoAfterPayload[d] = soft.noAfter[d].time;
       }
     }
 
     // Build soft_no_before from enabled days only
     const softNoBeforePayload: Record<string, string> = {};
     for (const d of DAYS) {
-      if (softNoBefore[d].enabled) {
-        softNoBeforePayload[d] = softNoBefore[d].time;
+      if (soft.noBefore[d].enabled) {
+        softNoBeforePayload[d] = soft.noBefore[d].time;
       }
     }
 
     const prefs: Prefs = {
-      prefer_one_free_day: preferOneFreeDay,
-      gap_shape: gapShape,
-      hard_free_days: hardFreeDays,
+      prefer_one_free_day: weights.preferOneFreeDay,
+      gap_shape: weights.gapShape,
+      hard_free_days: hard.freeDays,
       hard_no_after: hardNoAfterPayload,
       hard_no_before: hardNoBeforePayload,
-      soft_free_days: softFreeDays,
+      soft_free_days: soft.freeDays,
       soft_no_after: softNoAfterPayload,
       soft_no_before: softNoBeforePayload,
       weights: {
-        gaps_per_min: GAP_WEIGHTS[gapWeightPreset],
-        late_after_per_min: EARLY_LATE_WEIGHTS[earlyLateWeightPreset],
-        early_before_per_min: EARLY_LATE_WEIGHTS[earlyLateWeightPreset],
+        gaps_per_min: GAP_WEIGHTS[weights.gapWeightPreset],
+        late_after_per_min: EARLY_LATE_WEIGHTS[weights.earlyLateWeightPreset],
+        early_before_per_min: EARLY_LATE_WEIGHTS[weights.earlyLateWeightPreset],
       },
     };
 
@@ -544,8 +439,8 @@ export default function Home() {
                 <DayCheckboxGroup
                   idPrefix="hard-free"
                   days={DAYS}
-                  selected={hardFreeDays}
-                  onChange={setHardFreeDays}
+                  selected={hard.freeDays}
+                  onChange={hard.setFreeDays}
                 />
               </div>
 
@@ -555,9 +450,9 @@ export default function Home() {
                 <DayTimeGroup
                   idPrefix="hard-after"
                   days={DAYS}
-                  values={hardNoAfter}
+                  values={hard.noAfter}
                   times={NO_AFTER_TIMES}
-                  onChange={setHardNoAfter}
+                  onChange={hard.setNoAfter}
                 />
               </div>
 
@@ -567,9 +462,9 @@ export default function Home() {
                 <DayTimeGroup
                   idPrefix="hard-before"
                   days={DAYS}
-                  values={hardNoBefore}
+                  values={hard.noBefore}
                   times={NO_BEFORE_TIMES}
-                  onChange={setHardNoBefore}
+                  onChange={hard.setNoBefore}
                 />
               </div>
             </div>
@@ -607,8 +502,8 @@ export default function Home() {
                 <DayCheckboxGroup
                   idPrefix="soft-free"
                   days={DAYS}
-                  selected={softFreeDays}
-                  onChange={setSoftFreeDays}
+                  selected={soft.freeDays}
+                  onChange={soft.setFreeDays}
                 />
               </div>
 
@@ -618,9 +513,9 @@ export default function Home() {
                 <DayTimeGroup
                   idPrefix="soft-after"
                   days={DAYS}
-                  values={softNoAfter}
+                  values={soft.noAfter}
                   times={NO_AFTER_TIMES}
-                  onChange={setSoftNoAfter}
+                  onChange={soft.setNoAfter}
                 />
               </div>
 
@@ -630,9 +525,9 @@ export default function Home() {
                 <DayTimeGroup
                   idPrefix="soft-before"
                   days={DAYS}
-                  values={softNoBefore}
+                  values={soft.noBefore}
                   times={NO_BEFORE_TIMES}
-                  onChange={setSoftNoBefore}
+                  onChange={soft.setNoBefore}
                 />
               </div>
 
@@ -646,8 +541,8 @@ export default function Home() {
               <div className="flex items-center gap-2 text-sm text-foreground">
                 <span className="w-36">Gap penalty:</span>
                 <Select
-                  value={gapWeightPreset}
-                  onValueChange={(v) => setGapWeightPreset(v as WeightPreset)}
+                  value={weights.gapWeightPreset}
+                  onValueChange={(v) => weights.setGapWeightPreset(v as WeightPreset)}
                 >
                   <SelectTrigger size="sm" className="w-28"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -660,8 +555,8 @@ export default function Home() {
               <div className="flex items-center gap-2 text-sm text-foreground">
                 <span className="w-36">Early/late penalty:</span>
                 <Select
-                  value={earlyLateWeightPreset}
-                  onValueChange={(v) => setEarlyLateWeightPreset(v as WeightPreset)}
+                  value={weights.earlyLateWeightPreset}
+                  onValueChange={(v) => weights.setEarlyLateWeightPreset(v as WeightPreset)}
                 >
                   <SelectTrigger size="sm" className="w-28"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -674,8 +569,8 @@ export default function Home() {
               <div className="flex items-center gap-2 text-sm text-foreground">
                 <span className="w-36">Gap shape:</span>
                 <Select
-                  value={gapShape}
-                  onValueChange={(v) => setGapShape(v as GapShape)}
+                  value={weights.gapShape}
+                  onValueChange={(v) => weights.setGapShape(v as GapShape)}
                   items={[
                     { value: "no_preference", label: "No preference" },
                     { value: "consolidated", label: "Prefer one long gap" },
@@ -696,8 +591,8 @@ export default function Home() {
               <div className="flex items-center gap-2">
                 <Checkbox
                   id="prefer-one-free-day"
-                  checked={preferOneFreeDay}
-                  onCheckedChange={(checked) => setPreferOneFreeDay(checked === true)}
+                  checked={weights.preferOneFreeDay}
+                  onCheckedChange={(checked) => weights.setPreferOneFreeDay(checked === true)}
                 />
                 <Label htmlFor="prefer-one-free-day" className="font-normal">
                   Prefer at least one free weekday
