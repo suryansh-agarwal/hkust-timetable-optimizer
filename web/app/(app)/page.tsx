@@ -5,21 +5,15 @@ import { createClient } from "@/lib/supabase/client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { optimizeRanked, Prefs, SectionLock } from "@/lib/api";
 import {
-  bonusLabel,
-  computeStatsFromMeetings,
   flattenSchedule,
-  formatDayList,
   makePinId,
-  minutesToTime,
-  penaltyLabel,
-  type Bonus,
-  type Penalty,
   type Pinned,
 } from "@/lib/schedule";
-import { TimetableGrid, CompareTimetableGrid } from "../components/TimetableGrid";
+import { CompareTimetableGrid } from "../components/TimetableGrid";
 import { CoursePicker } from "../components/CoursePicker";
 import { Header } from "../components/Header";
 import { PreferencesPanel } from "../components/PreferencesPanel";
+import { ResultsList } from "../components/ResultsList";
 import {
   DAYS,
   GAP_WEIGHTS,
@@ -316,9 +310,6 @@ export default function Home() {
     }
   }
 
-  const active = result?.results?.[activeIdx];
-  const meetings = useMemo(() => (active ? flattenSchedule(active.schedule) : []), [active]);
-
   useEffect(() => {
     if (!didJustOptimize) return;
     if ((result?.results?.length ?? 0) > 0) {
@@ -376,151 +367,15 @@ export default function Home() {
       <div ref={resultsRef} id="results" style={{ scrollMarginTop: 90 }}>
         {result && (
           <div style={{ marginTop: 14, border: "1px solid var(--border)", borderRadius: 12, padding: 14 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-            <div>
-              <div style={{ fontWeight: 700 }}>Results</div>
-              <div style={{ fontSize: 13, color: "var(--text-muted)" }}>
-                considered {result.considered}, returned {result.returned}
-              </div>
-            </div>
-          </div>
-
-          {/* Schedule cards */}
-          <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 12 }}>
-            {result.results.map((r, i: number) => {
-              const ms = flattenSchedule(r.schedule);
-              const stats = computeStatsFromMeetings(ms);
-
-              const isActive = i === activeIdx;
-              const isPinned = pinned.some((p) => p.term === term && p.sourceIdx === i);
-              // The gaps penalty and the free-days bonus are already stated
-              // exactly above as "Gaps: N min" and "Free days: N (...)", so as
-              // chips they only repeat the numbers in a noisier form.
-              const penalties = ((r.breakdown?.penalties ?? []) as Penalty[])
-                .filter((p) => p.type !== "gaps_minutes");
-              const bonuses = ((r.breakdown?.bonuses ?? []) as Bonus[])
-                .filter((b) => b.type !== "free_days");
-
-              return (
-                <div
-                  key={i}
-                  style={{
-                    position: "relative",
-                    textAlign: "left",
-                    borderRadius: 14,
-                    border: isActive ? "2px solid var(--active-border)" : "1px solid var(--border)",
-                    background: "var(--surface)",
-                    padding: 12,
-                    cursor: "pointer",
-                    boxShadow: isActive ? "var(--shadow-md)" : "none",
-                  }}
-                  onClick={() => setActiveIdx(i)}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setActiveIdx(i); }}
-                  role="button"
-                  tabIndex={0}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "baseline" }}>
-                    <div style={{ fontWeight: 800, fontSize: 14 }}>Option #{i + 1}</div>
-                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                      <div style={{ fontWeight: 900, fontSize: 16 }}>Score {r.score.toFixed(1)}</div>
-                      <Button
-                        variant={isPinned ? "default" : "outline"}
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          pinResultOption(r, i);
-                        }}
-                        title={isPinned ? "Pinned" : "Pin this option for comparison"}
-                      >
-                        {isPinned ? "✅ Pinned" : "📌 Pin"}
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div style={{ marginTop: 8, fontSize: 13, color: "var(--text-body)", lineHeight: 1.35 }}>
-                    <div>
-                      Free days: <b>{stats.freeDaysCount}</b> ({formatDayList(stats.freeDays)})
-                    </div>
-                    <div>
-                      Days on campus: <b>{stats.usedDaysCount}</b>
-                    </div>
-                    <div>
-                      Gaps: <b>{stats.gapsMin}</b> min
-                    </div>
-                    <div>
-                      Latest end:{" "}
-                      <b>
-                        {stats.latestEndMin >= 0
-                          ? `${stats.latestEndDay ?? ""} ${minutesToTime(stats.latestEndMin)}`.trim()
-                          : "-"}
-                      </b>
-                    </div>
-                  </div>
-
-                  {/* quick breakdown chips */}
-                  <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 6 }}>
-                    {penalties.slice(0, 3).map((p, idx: number) => (
-                      <span
-                        key={`p-${idx}`}
-                        style={{
-                          fontSize: 12,
-                          padding: "4px 8px",
-                          borderRadius: 999,
-                          background: "var(--danger-chip-bg)",
-                          border: "1px solid var(--danger-border)",
-                        }}
-                        title={JSON.stringify(p)}
-                      >
-                        ❌ {penaltyLabel(p)}
-                      </span>
-                    ))}
-                    {bonuses.slice(0, 2).map((b, idx: number) => (
-                      <span
-                        key={`b-${idx}`}
-                        style={{
-                          fontSize: 12,
-                          padding: "4px 8px",
-                          borderRadius: 999,
-                          background: "var(--success-bg)",
-                          border: "1px solid var(--success-border)",
-                        }}
-                        title={JSON.stringify(b)}
-                      >
-                        ✅ {bonusLabel(b)}
-                      </span>
-                    ))}
-                    {penalties.length === 0 && bonuses.length === 0 && (
-                      <span style={{ fontSize: 12, color: "var(--text-muted)" }}>No notable tradeoffs</span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          <div style={{ marginTop: 8, display: "flex", gap: 12, flexWrap: "wrap" }}>
-            <div style={{ fontWeight: 700 }}>Score: {active?.score.toFixed(1)}</div>
-            <div style={{ fontSize: 13, color: "var(--text-body)" }}>
-              {/* Same two omissions as the cards above: the gaps penalty and
-                  the free-days bonus are already stated per option, so
-                  repeating them here adds nothing. */}
-              {(active?.breakdown?.penalties as Penalty[] | undefined)
-                ?.filter((p) => p.type !== "gaps_minutes")
-                .map((p, idx: number) => (
-                  <span key={idx} style={{ marginRight: 8 }}>❌ {penaltyLabel(p)}</span>
-                ))}
-              {(active?.breakdown?.bonuses as Bonus[] | undefined)
-                ?.filter((b) => b.type !== "free_days")
-                .map((b, idx: number) => (
-                  <span key={idx} style={{ marginRight: 8 }}>✅ {bonusLabel(b)}</span>
-                ))}
-            </div>
-          </div>
-
-          {/* simple per-day list view (Stage 6 can be a real grid) */}
-          <div style={{ marginTop: 10 }}>
-            <TimetableGrid meetings={meetings} startHour={8} endHour={20} />
-          </div>
+          <ResultsList
+            results={result.results}
+            considered={result.considered}
+            returned={result.returned}
+            activeIdx={activeIdx}
+            onSelectIdx={setActiveIdx}
+            isPinned={(i) => pinned.some((p) => p.term === term && p.sourceIdx === i)}
+            onPin={pinResultOption}
+          />
 
           {/* ---- Compare Section ---- */}
           <div style={{ marginTop: 20, borderTop: "1px solid var(--border-subtle)", paddingTop: 16 }}>
