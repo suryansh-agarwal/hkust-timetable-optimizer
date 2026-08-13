@@ -18,15 +18,13 @@ export function Header({
   onOptimize: () => void;
 }>) {
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+    <div className="flex flex-wrap items-center justify-between gap-4">
       <div>
-        <h1 style={{ fontSize: 28, fontWeight: 700, margin: 0 }}>HKUST Timetable Optimizer</h1>
-        <div style={{ marginTop: 4, fontSize: 13, color: "var(--text-muted)" }}>
-          Build a schedule with soft and hard preferences
-        </div>
-        <div><b>Logged in as:</b> {email}</div>
+        <h1 className="text-3xl font-semibold tracking-tight">HKUST Timetable Optimizer</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Build a schedule with soft and hard preferences</p>
+        <p className="mt-1 text-sm"><span className="font-semibold">Logged in as:</span> {email}</p>
       </div>
-      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+      <div className="flex items-center gap-2">
         <ThemeToggle />
         <a
           href="https://docs.google.com/forms/d/e/1FAIpQLSdUPWeLVqBYbBbZunz-tPnI3mvgGDgKN2onmYPKlZ13OcwNUA/viewform?usp=publish-editor"
