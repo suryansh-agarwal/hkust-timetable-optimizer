@@ -341,7 +341,7 @@ export default function Home() {
             sectionLocks={sectionLocks}
             setSectionLocks={setSectionLocks}
           />
-          <p className="mt-2 text-sm">
+          <p className="mt-1 text-sm">
             <span className="font-semibold">Selected:</span> {selectedCourses.join(", ")}
           </p>
         </Card>
