@@ -4,23 +4,30 @@ import { createClient } from "@/lib/supabase/client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { optimizeRanked, Prefs, SectionLock } from "@/lib/api";
-import { TimetableGrid, CompareTimetableGrid } from "../components/TimetableGrid";
+import {
+  makePinId,
+  type Pinned,
+} from "@/lib/schedule";
 import { CoursePicker } from "../components/CoursePicker";
-import { DayCheckboxGroup, DayTimeGroup, type DayPref } from "../components/DayTimePrefs";
+import { Header } from "../components/Header";
+import { PreferencesPanel } from "../components/PreferencesPanel";
+import { ResultsList } from "../components/ResultsList";
+import { CompareSection } from "../components/CompareSection";
+import {
+  DAYS,
+  GAP_WEIGHTS,
+  EARLY_LATE_WEIGHTS,
+  validateTimeConstraints,
+  useDayPrefs,
+  useWeightPrefs,
+} from "../components/usePreferences";
 import { toast } from "sonner";
-import { ThemeToggle } from "@/components/theme-toggle";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
-import { Info, MessageSquare, X } from "lucide-react";
-import { Button, buttonVariants } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -31,7 +38,6 @@ import {
 } from "@/components/ui/select";
 
 
-const DAYS = ["Mo", "Tu", "We", "Th", "Fr"] as const;
 const TERM_OPTIONS = [
   { value: "2610", label: "2026 Fall" },
   { value: "2540", label: "2026 Summer" },
@@ -39,211 +45,6 @@ const TERM_OPTIONS = [
 ] as const;
 
 const DEFAULT_TERM = "2610";
-
-// Base UI treats value="" as "nothing selected" (SelectRoot.js:185), so the
-// "(select)" item would be unselectable and the trigger would fall back to the
-// placeholder. Carry a sentinel through the control and map it back to "" at
-// the state boundary, because compareA/compareB feed the compare view as "".
-const NO_SELECTION = "__none";
-
-// Time options for soft no-after (12:00–20:00 in 30-min steps)
-function genNoAfterTimes(): string[] {
-  const times: string[] = [];
-  for (let h = 12; h <= 20; h++) {
-    times.push(`${h.toString().padStart(2, "0")}:00`);
-    if (h < 20) times.push(`${h.toString().padStart(2, "0")}:30`);
-  }
-  return times;
-}
-
-// Time options for soft no-before (09:00–15:00 in 30-min steps)
-function genNoBeforeTimes(): string[] {
-  const times: string[] = [];
-  for (let h = 9; h <= 15; h++) {
-    times.push(`${h.toString().padStart(2, "0")}:00`);
-    if (h < 15) times.push(`${h.toString().padStart(2, "0")}:30`);
-  }
-  return times;
-}
-
-// Convert "HH:MM" to minutes since midnight
-function timeToMinutes(hhmm: string): number {
-  const [h, m] = hhmm.split(":").map(Number);
-  return h * 60 + m;
-}
-
-// Validate that no-before and no-after constraints don't conflict on the same day
-function validateTimeConstraints(
-  hardNoBefore: Record<string, { enabled: boolean; time: string }>,
-  hardNoAfter: Record<string, { enabled: boolean; time: string }>,
-  softNoBefore: Record<string, { enabled: boolean; time: string }>,
-  softNoAfter: Record<string, { enabled: boolean; time: string }>,
-  days: readonly string[]
-): string[] {
-  const conflicts: string[] = [];
-
-  for (const d of days) {
-    // Collect all no-before times for this day (both hard and soft)
-    const noBeforeTimes: { type: string; time: number }[] = [];
-    if (hardNoBefore[d]?.enabled) {
-      noBeforeTimes.push({ type: "hard", time: timeToMinutes(hardNoBefore[d].time) });
-    }
-    if (softNoBefore[d]?.enabled) {
-      noBeforeTimes.push({ type: "soft", time: timeToMinutes(softNoBefore[d].time) });
-    }
-
-    // Collect all no-after times for this day (both hard and soft)
-    const noAfterTimes: { type: string; time: number }[] = [];
-    if (hardNoAfter[d]?.enabled) {
-      noAfterTimes.push({ type: "hard", time: timeToMinutes(hardNoAfter[d].time) });
-    }
-    if (softNoAfter[d]?.enabled) {
-      noAfterTimes.push({ type: "soft", time: timeToMinutes(softNoAfter[d].time) });
-    }
-
-    // Check for conflicts: if no-before >= no-after, it's impossible
-    for (const nb of noBeforeTimes) {
-      for (const na of noAfterTimes) {
-        if (nb.time >= na.time) {
-          const nbTimeStr = hardNoBefore[d]?.enabled && nb.type === "hard" ? hardNoBefore[d].time : softNoBefore[d].time;
-          const naTimeStr = hardNoAfter[d]?.enabled && na.type === "hard" ? hardNoAfter[d].time : softNoAfter[d].time;
-          conflicts.push(
-            `${d}: "no classes before ${nbTimeStr}" (${nb.type}) conflicts with "no classes after ${naTimeStr}" (${na.type})`
-          );
-        }
-      }
-    }
-  }
-
-  return conflicts;
-}
-
-const NO_AFTER_TIMES = genNoAfterTimes();
-const NO_BEFORE_TIMES = genNoBeforeTimes();
-
-// Weight presets
-const GAP_WEIGHTS = { Low: 0.05, Med: 0.10, High: 0.20 } as const;
-const EARLY_LATE_WEIGHTS = { Low: 0.25, Med: 0.50, High: 1.00 } as const;
-type WeightPreset = "Low" | "Med" | "High";
-type GapShape = "no_preference" | "consolidated" | "fragmented";
-
-function minutesToTime(m: number) {
-  const hh = Math.floor(m / 60).toString().padStart(2, "0");
-  const mm = (m % 60).toString().padStart(2, "0");
-  return `${hh}:${mm}`;
-}
-
-type Meeting = { day: string; start_min: number; end_min: number; course_code: string; section: string };
-
-// ---- Pin types ----
-type Pinned = {
-  id: string;
-  name: string;
-  term: string;
-  sourceIdx: number;
-  score: number;
-  breakdown: unknown;
-  schedule: unknown[];
-  createdAt: number;
-};
-
-function makePinId() {
-  return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
-}
-function flattenSchedule(schedule: unknown[]): Meeting[] {
-  const out: Meeting[] = [];
-  for (const c of schedule as { course_code: string; parts: { section: string; meetings: { day: string; start_min: number; end_min: number }[] }[] }[]) {
-    for (const p of c.parts) {
-      for (const mtg of p.meetings) {
-        out.push({
-          day: mtg.day,
-          start_min: mtg.start_min,
-          end_min: mtg.end_min,
-          course_code: c.course_code,
-          section: p.section,
-        });
-      }
-    }
-  }
-  return out;
-}
-
-function computeStatsFromMeetings(meetings: Meeting[]) {
-  const days = ["Mo", "Tu", "We", "Th", "Fr"];
-  const byDay: Record<string, Meeting[]> = { Mo: [], Tu: [], We: [], Th: [], Fr: [] };
-  for (const m of meetings) {
-    if (byDay[m.day]) byDay[m.day].push(m);
-  }
-
-  const usedDays = days.filter((d) => byDay[d].length > 0);
-  const freeDays = days.filter((d) => byDay[d].length === 0);
-
-  // Latest end time across the week, and the day it falls on - "18:50" alone
-  // does not tell you which day you are stuck on campus until the evening.
-  let latestEnd = -1;
-  let latestEndDay: string | null = null;
-  for (const m of meetings) {
-    if (m.end_min > latestEnd) {
-      latestEnd = m.end_min;
-      latestEndDay = m.day;
-    }
-  }
-
-  // Total gaps per day (time between consecutive classes)
-  let gapsMin = 0;
-  for (const d of usedDays) {
-    const arr = [...byDay[d]].sort((a, b) => a.start_min - b.start_min);
-    for (let i = 1; i < arr.length; i++) {
-      const gap = arr[i].start_min - arr[i - 1].end_min;
-      if (gap > 0) gapsMin += gap;
-    }
-  }
-
-  // Earliest start
-  let earliestStart = 99999;
-  for (const m of meetings) earliestStart = Math.min(earliestStart, m.start_min);
-
-  return {
-    usedDaysCount: usedDays.length,
-    freeDaysCount: freeDays.length,
-    freeDays,
-    latestEndMin: latestEnd,
-    latestEndDay,
-    earliestStartMin: earliestStart === 99999 ? null : earliestStart,
-    gapsMin,
-  };
-}
-
-function formatDayList(days: string[]) {
-  if (days.length === 0) return "(none)";
-  return days.join(", ");
-}
-
-type Penalty = { type: string; day?: string; cutoff?: string; minutes?: number; shape?: string };
-type Bonus = { type: string; day?: string; count?: number; value?: number };
-
-// Covers every penalty type scoring.py can emit. Anything unlabelled falls
-// through to its raw name, which is what used to leak "soft_no_before" into
-// the UI, so add a case here when adding a penalty.
-function penaltyLabel(p: Penalty) {
-  if (p.type === "soft_no_after") return `After cutoff (${p.day} ${p.cutoff})`;
-  if (p.type === "soft_no_before") return `Before cutoff (${p.day} ${p.cutoff})`;
-  if (p.type === "soft_free_day") return `${p.day} not free`;
-  if (p.type === "gaps_minutes") {
-    const shapeLabel =
-      p.shape === "consolidated" ? ", prefer 1 long" : p.shape === "fragmented" ? ", prefer short" : "";
-    return `Gaps (${Math.round((p.minutes ?? 0) * 10) / 10} min${shapeLabel})`;
-  }
-  if (p.type === "hard_free_day_violation") return `Hard free day violated (${p.day})`;
-  return p.type;
-}
-
-function bonusLabel(b: Bonus) {
-  if (b.type === "free_days") return `Free days (+${b.value})`;
-  if (b.type === "soft_free_day") return `${b.day} free`;
-  return b.type;
-}
-
 
 export default function Home() {
   const supabase = useMemo(() => createClient(), []);
@@ -355,44 +156,9 @@ export default function Home() {
     return () => clearTimeout(handle);
   }, [supabase, userId, term, selectedCourses, instructorLocks, sectionLocks, selectionsLoaded]);
 
-  // Hard free days (multi-select)
-  const [hardFreeDays, setHardFreeDays] = useState<string[]>([]);
-  const [softFreeDays, setSoftFreeDays] = useState<string[]>([]);
-
-  // Per-day hard no-after constraints
-  const [hardNoAfter, setHardNoAfter] = useState<Record<string, DayPref>>(() => {
-    const init: Record<string, DayPref> = {};
-    for (const d of DAYS) init[d] = { enabled: false, time: "15:00" };
-    return init;
-  });
-
-  // Per-day hard no-before constraints
-  const [hardNoBefore, setHardNoBefore] = useState<Record<string, DayPref>>(() => {
-    const init: Record<string, DayPref> = {};
-    for (const d of DAYS) init[d] = { enabled: false, time: "09:00" };
-    return init;
-  });
-
-  // Per-day soft no-after constraints
-  const [softNoAfter, setSoftNoAfter] = useState<Record<string, DayPref>>(() => {
-    const init: Record<string, DayPref> = {};
-    for (const d of DAYS) init[d] = { enabled: false, time: "15:00" };
-    return init;
-  });
-
-  // Per-day soft no-before constraints
-  const [softNoBefore, setSoftNoBefore] = useState<Record<string, DayPref>>(() => {
-    const init: Record<string, DayPref> = {};
-    for (const d of DAYS) init[d] = { enabled: false, time: "09:00" };
-    return init;
-  });
-
-  // Weight presets
-  const [gapWeightPreset, setGapWeightPreset] = useState<WeightPreset>("Med");
-  const [earlyLateWeightPreset, setEarlyLateWeightPreset] = useState<WeightPreset>("Med");
-
-  const [preferOneFreeDay, setPreferOneFreeDay] = useState(true);
-  const [gapShape, setGapShape] = useState<GapShape>("no_preference");
+  const hard = useDayPrefs();
+  const soft = useDayPrefs();
+  const weights = useWeightPrefs();
 
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{ results: { score: number; breakdown: { penalties?: unknown[]; bonuses?: unknown[] }; schedule: unknown[] }[]; considered: number; returned: number } | null>(null);
@@ -438,12 +204,6 @@ export default function Home() {
     setPinned(pinned.map((p) => (p.id === id ? { ...p, name } : p)));
   }
 
-  const pinnedA = pinned.find((p) => p.id === compareA) ?? null;
-  const pinnedB = pinned.find((p) => p.id === compareB) ?? null;
-
-  const meetingsA = useMemo(() => (pinnedA ? flattenSchedule(pinnedA.schedule) : []), [pinnedA]);
-  const meetingsB = useMemo(() => (pinnedB ? flattenSchedule(pinnedB.schedule) : []), [pinnedB]);
-
   async function runOptimize() {
     setError("");
     setResult(null);
@@ -451,7 +211,7 @@ export default function Home() {
     setDidJustOptimize(false);
 
     // Validate time constraints before running
-    const conflicts = validateTimeConstraints(hardNoBefore, hardNoAfter, softNoBefore, softNoAfter, DAYS);
+    const conflicts = validateTimeConstraints(hard.noBefore, hard.noAfter, soft.noBefore, soft.noAfter, DAYS);
     if (conflicts.length > 0) {
       setError(`Conflicting time preferences detected:\n${conflicts.join("\n")}\n\nPlease adjust your preferences so that "no classes before" times are earlier than "no classes after" times for the same day.`);
       return;
@@ -462,48 +222,48 @@ export default function Home() {
     // Build hard_no_after from enabled days only
     const hardNoAfterPayload: Record<string, string> = {};
     for (const d of DAYS) {
-      if (hardNoAfter[d].enabled) {
-        hardNoAfterPayload[d] = hardNoAfter[d].time;
+      if (hard.noAfter[d].enabled) {
+        hardNoAfterPayload[d] = hard.noAfter[d].time;
       }
     }
 
     // Build hard_no_before from enabled days only
     const hardNoBeforePayload: Record<string, string> = {};
     for (const d of DAYS) {
-      if (hardNoBefore[d].enabled) {
-        hardNoBeforePayload[d] = hardNoBefore[d].time;
+      if (hard.noBefore[d].enabled) {
+        hardNoBeforePayload[d] = hard.noBefore[d].time;
       }
     }
 
     // Build soft_no_after from enabled days only
     const softNoAfterPayload: Record<string, string> = {};
     for (const d of DAYS) {
-      if (softNoAfter[d].enabled) {
-        softNoAfterPayload[d] = softNoAfter[d].time;
+      if (soft.noAfter[d].enabled) {
+        softNoAfterPayload[d] = soft.noAfter[d].time;
       }
     }
 
     // Build soft_no_before from enabled days only
     const softNoBeforePayload: Record<string, string> = {};
     for (const d of DAYS) {
-      if (softNoBefore[d].enabled) {
-        softNoBeforePayload[d] = softNoBefore[d].time;
+      if (soft.noBefore[d].enabled) {
+        softNoBeforePayload[d] = soft.noBefore[d].time;
       }
     }
 
     const prefs: Prefs = {
-      prefer_one_free_day: preferOneFreeDay,
-      gap_shape: gapShape,
-      hard_free_days: hardFreeDays,
+      prefer_one_free_day: weights.preferOneFreeDay,
+      gap_shape: weights.gapShape,
+      hard_free_days: hard.freeDays,
       hard_no_after: hardNoAfterPayload,
       hard_no_before: hardNoBeforePayload,
-      soft_free_days: softFreeDays,
+      soft_free_days: soft.freeDays,
       soft_no_after: softNoAfterPayload,
       soft_no_before: softNoBeforePayload,
       weights: {
-        gaps_per_min: GAP_WEIGHTS[gapWeightPreset],
-        late_after_per_min: EARLY_LATE_WEIGHTS[earlyLateWeightPreset],
-        early_before_per_min: EARLY_LATE_WEIGHTS[earlyLateWeightPreset],
+        gaps_per_min: GAP_WEIGHTS[weights.gapWeightPreset],
+        late_after_per_min: EARLY_LATE_WEIGHTS[weights.earlyLateWeightPreset],
+        early_before_per_min: EARLY_LATE_WEIGHTS[weights.earlyLateWeightPreset],
       },
     };
 
@@ -534,9 +294,6 @@ export default function Home() {
     }
   }
 
-  const active = result?.results?.[activeIdx];
-  const meetings = useMemo(() => (active ? flattenSchedule(active.schedule) : []), [active]);
-
   useEffect(() => {
     if (!didJustOptimize) return;
     if ((result?.results?.length ?? 0) > 0) {
@@ -547,38 +304,13 @@ export default function Home() {
   
   return (
     <div style={{ maxWidth: 1200, margin: "0 auto", padding: "20px 24px", fontFamily: "system-ui", width: "100%" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-        <div>
-          <h1 style={{ fontSize: 28, fontWeight: 700, margin: 0 }}>HKUST Timetable Optimizer</h1>
-          <div style={{ marginTop: 4, fontSize: 13, color: "var(--text-muted)" }}>
-            Build a schedule with soft and hard preferences
-          </div>
-          <div><b>Logged in as:</b> {email}</div>
-        </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <ThemeToggle />
-          <a
-            href="https://docs.google.com/forms/d/e/1FAIpQLSdUPWeLVqBYbBbZunz-tPnI3mvgGDgKN2onmYPKlZ13OcwNUA/viewform?usp=publish-editor"
-            target="_blank"
-            rel="noreferrer"
-            aria-label="Leave feedback"
-            className={buttonVariants({ variant: "outline", size: "sm" })}
-          >
-            <MessageSquare className="size-4" aria-hidden />
-            Feedback
-          </a>
-          <Button variant="outline" size="sm" onClick={() => setShowHelp(true)}>
-            How to use?
-          </Button>
-          <Button
-            size="sm"
-            onClick={runOptimize}
-            disabled={loading || selectedCourses.length === 0}
-          >
-            {loading ? "Optimizing..." : "Optimize"}
-          </Button>
-        </div>
-      </div>
+      <Header
+        email={email}
+        loading={loading}
+        optimizeDisabled={loading || selectedCourses.length === 0}
+        onShowHelp={() => setShowHelp(true)}
+        onOptimize={runOptimize}
+      />
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
         <div style={{ border: "1px solid var(--border)", borderRadius: 12, padding: 14 }}>
           <div className="mb-3">
@@ -613,494 +345,31 @@ export default function Home() {
           </div>
         </div>
 
-        <div style={{ border: "1px solid var(--border)", borderRadius: 12, padding: 14, maxHeight: 520, overflowY: "auto" }}>
-          <h2 style={{ fontSize: 18, fontWeight: 600 }}>Preferences</h2>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 10 }}>
-            <div style={{ border: "1px solid var(--border-subtle)", borderRadius: 10, padding: 12, background: "var(--surface-2)" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, fontWeight: 700, marginBottom: 8 }}>
-                <span>Hard preferences</span>
-                <Dialog>
-                  <DialogTrigger
-                    aria-label="About hard preferences"
-                    className="inline-flex size-5 items-center justify-center rounded-full border border-border text-xs font-bold text-muted-foreground hover:bg-muted"
-                  >
-                    <Info className="size-3" aria-hidden />
-                  </DialogTrigger>
-                  <DialogContent className="max-w-md sm:max-w-md">
-                    <DialogHeader>
-                      <DialogTitle>Hard preferences</DialogTitle>
-                      <DialogDescription>
-                        Hard preferences are non-negotiable constraints. If a timetable
-                        violates one, it is rejected.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <ul className="ml-4 list-disc text-sm text-foreground">
-                      <li>No classes before 10:30</li>
-                      <li>Keep Friday completely free</li>
-                      <li>Avoid clashes (required)</li>
-                    </ul>
-                  </DialogContent>
-                </Dialog>
-              </div>
-
-              {/* Hard Free Days (multi-select) */}
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Must be free</div>
-                <DayCheckboxGroup
-                  idPrefix="hard-free"
-                  days={DAYS}
-                  selected={hardFreeDays}
-                  onChange={setHardFreeDays}
-                />
-              </div>
-
-              {/* Hard No Classes After */}
-              <div style={{ marginTop: 14 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>No classes after</div>
-                <DayTimeGroup
-                  idPrefix="hard-after"
-                  days={DAYS}
-                  values={hardNoAfter}
-                  times={NO_AFTER_TIMES}
-                  onChange={setHardNoAfter}
-                />
-              </div>
-
-              {/* Hard No Classes Before */}
-              <div style={{ marginTop: 14 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>No classes before</div>
-                <DayTimeGroup
-                  idPrefix="hard-before"
-                  days={DAYS}
-                  values={hardNoBefore}
-                  times={NO_BEFORE_TIMES}
-                  onChange={setHardNoBefore}
-                />
-              </div>
-            </div>
-
-            <div style={{ border: "1px solid var(--border-subtle)", borderRadius: 10, padding: 12 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, fontWeight: 700, marginBottom: 8 }}>
-                <span>Soft preferences</span>
-                <Dialog>
-                  <DialogTrigger
-                    aria-label="About soft preferences"
-                    className="inline-flex size-5 items-center justify-center rounded-full border border-border text-xs font-bold text-muted-foreground hover:bg-muted"
-                  >
-                    <Info className="size-3" aria-hidden />
-                  </DialogTrigger>
-                  <DialogContent className="max-w-md sm:max-w-md">
-                    <DialogHeader>
-                      <DialogTitle>Soft preferences</DialogTitle>
-                      <DialogDescription>
-                        Soft preferences are nice-to-haves. The optimiser will try to
-                        satisfy them, but may trade them off to find a feasible timetable.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <ul className="ml-4 list-disc text-sm text-foreground">
-                      <li>Minimize gaps between classes</li>
-                      <li>Prefer compact schedules</li>
-                      <li>Prefer fewer days on campus</li>
-                    </ul>
-                  </DialogContent>
-                </Dialog>
-              </div>
-
-              {/* Soft Free Days (multi-select) */}
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Prefer free</div>
-                <DayCheckboxGroup
-                  idPrefix="soft-free"
-                  days={DAYS}
-                  selected={softFreeDays}
-                  onChange={setSoftFreeDays}
-                />
-              </div>
-
-              {/* Soft No Classes After */}
-              <div style={{ marginTop: 14 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>No classes after</div>
-                <DayTimeGroup
-                  idPrefix="soft-after"
-                  days={DAYS}
-                  values={softNoAfter}
-                  times={NO_AFTER_TIMES}
-                  onChange={setSoftNoAfter}
-                />
-              </div>
-
-              {/* Soft No Classes Before */}
-              <div style={{ marginTop: 14 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>No classes before</div>
-                <DayTimeGroup
-                  idPrefix="soft-before"
-                  days={DAYS}
-                  values={softNoBefore}
-                  times={NO_BEFORE_TIMES}
-                  onChange={setSoftNoBefore}
-                />
-              </div>
-
-            </div>
-          </div>
-
-          {/* Weights + style prefs (outside soft box) */}
-          <div style={{ marginTop: 14 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>Weights & style</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <div className="flex items-center gap-2 text-sm text-foreground">
-                <span className="w-36">Gap penalty:</span>
-                <Select
-                  value={gapWeightPreset}
-                  onValueChange={(v) => setGapWeightPreset(v as WeightPreset)}
-                >
-                  <SelectTrigger size="sm" className="w-28"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Low">Low</SelectItem>
-                    <SelectItem value="Med">Med</SelectItem>
-                    <SelectItem value="High">High</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-center gap-2 text-sm text-foreground">
-                <span className="w-36">Early/late penalty:</span>
-                <Select
-                  value={earlyLateWeightPreset}
-                  onValueChange={(v) => setEarlyLateWeightPreset(v as WeightPreset)}
-                >
-                  <SelectTrigger size="sm" className="w-28"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Low">Low</SelectItem>
-                    <SelectItem value="Med">Med</SelectItem>
-                    <SelectItem value="High">High</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-center gap-2 text-sm text-foreground">
-                <span className="w-36">Gap shape:</span>
-                <Select
-                  value={gapShape}
-                  onValueChange={(v) => setGapShape(v as GapShape)}
-                  items={[
-                    { value: "no_preference", label: "No preference" },
-                    { value: "consolidated", label: "Prefer one long gap" },
-                    { value: "fragmented", label: "Prefer several short gaps" },
-                  ]}
-                >
-                  <SelectTrigger size="sm" className="w-56"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="no_preference">No preference</SelectItem>
-                    <SelectItem value="consolidated">Prefer one long gap</SelectItem>
-                    <SelectItem value="fragmented">Prefer several short gaps</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="mt-3 flex flex-col gap-2 text-sm text-foreground">
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="prefer-one-free-day"
-                  checked={preferOneFreeDay}
-                  onCheckedChange={(checked) => setPreferOneFreeDay(checked === true)}
-                />
-                <Label htmlFor="prefer-one-free-day" className="font-normal">
-                  Prefer at least one free weekday
-                </Label>
-              </div>
-            </div>
-          </div>
-
-          {error && <div style={{ marginTop: 8, color: "var(--danger)", whiteSpace: "pre-wrap" }}>{error}</div>}
-        </div>
+        <PreferencesPanel hard={hard} soft={soft} weights={weights} error={error} />
       </div>
 
       <div ref={resultsRef} id="results" style={{ scrollMarginTop: 90 }}>
         {result && (
           <div style={{ marginTop: 14, border: "1px solid var(--border)", borderRadius: 12, padding: 14 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-            <div>
-              <div style={{ fontWeight: 700 }}>Results</div>
-              <div style={{ fontSize: 13, color: "var(--text-muted)" }}>
-                considered {result.considered}, returned {result.returned}
-              </div>
-            </div>
-          </div>
+          <ResultsList
+            results={result.results}
+            considered={result.considered}
+            returned={result.returned}
+            activeIdx={activeIdx}
+            onSelectIdx={setActiveIdx}
+            isPinned={(i) => pinned.some((p) => p.term === term && p.sourceIdx === i)}
+            onPin={pinResultOption}
+          />
 
-          {/* Schedule cards */}
-          <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 12 }}>
-            {result.results.map((r, i: number) => {
-              const ms = flattenSchedule(r.schedule);
-              const stats = computeStatsFromMeetings(ms);
-
-              const isActive = i === activeIdx;
-              const isPinned = pinned.some((p) => p.term === term && p.sourceIdx === i);
-              // The gaps penalty and the free-days bonus are already stated
-              // exactly above as "Gaps: N min" and "Free days: N (...)", so as
-              // chips they only repeat the numbers in a noisier form.
-              const penalties = ((r.breakdown?.penalties ?? []) as Penalty[])
-                .filter((p) => p.type !== "gaps_minutes");
-              const bonuses = ((r.breakdown?.bonuses ?? []) as Bonus[])
-                .filter((b) => b.type !== "free_days");
-
-              return (
-                <div
-                  key={i}
-                  style={{
-                    position: "relative",
-                    textAlign: "left",
-                    borderRadius: 14,
-                    border: isActive ? "2px solid var(--active-border)" : "1px solid var(--border)",
-                    background: "var(--surface)",
-                    padding: 12,
-                    cursor: "pointer",
-                    boxShadow: isActive ? "var(--shadow-md)" : "none",
-                  }}
-                  onClick={() => setActiveIdx(i)}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setActiveIdx(i); }}
-                  role="button"
-                  tabIndex={0}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "baseline" }}>
-                    <div style={{ fontWeight: 800, fontSize: 14 }}>Option #{i + 1}</div>
-                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                      <div style={{ fontWeight: 900, fontSize: 16 }}>Score {r.score.toFixed(1)}</div>
-                      <Button
-                        variant={isPinned ? "default" : "outline"}
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          pinResultOption(r, i);
-                        }}
-                        title={isPinned ? "Pinned" : "Pin this option for comparison"}
-                      >
-                        {isPinned ? "✅ Pinned" : "📌 Pin"}
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div style={{ marginTop: 8, fontSize: 13, color: "var(--text-body)", lineHeight: 1.35 }}>
-                    <div>
-                      Free days: <b>{stats.freeDaysCount}</b> ({formatDayList(stats.freeDays)})
-                    </div>
-                    <div>
-                      Days on campus: <b>{stats.usedDaysCount}</b>
-                    </div>
-                    <div>
-                      Gaps: <b>{stats.gapsMin}</b> min
-                    </div>
-                    <div>
-                      Latest end:{" "}
-                      <b>
-                        {stats.latestEndMin >= 0
-                          ? `${stats.latestEndDay ?? ""} ${minutesToTime(stats.latestEndMin)}`.trim()
-                          : "-"}
-                      </b>
-                    </div>
-                  </div>
-
-                  {/* quick breakdown chips */}
-                  <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 6 }}>
-                    {penalties.slice(0, 3).map((p, idx: number) => (
-                      <span
-                        key={`p-${idx}`}
-                        style={{
-                          fontSize: 12,
-                          padding: "4px 8px",
-                          borderRadius: 999,
-                          background: "var(--danger-chip-bg)",
-                          border: "1px solid var(--danger-border)",
-                        }}
-                        title={JSON.stringify(p)}
-                      >
-                        ❌ {penaltyLabel(p)}
-                      </span>
-                    ))}
-                    {bonuses.slice(0, 2).map((b, idx: number) => (
-                      <span
-                        key={`b-${idx}`}
-                        style={{
-                          fontSize: 12,
-                          padding: "4px 8px",
-                          borderRadius: 999,
-                          background: "var(--success-bg)",
-                          border: "1px solid var(--success-border)",
-                        }}
-                        title={JSON.stringify(b)}
-                      >
-                        ✅ {bonusLabel(b)}
-                      </span>
-                    ))}
-                    {penalties.length === 0 && bonuses.length === 0 && (
-                      <span style={{ fontSize: 12, color: "var(--text-muted)" }}>No notable tradeoffs</span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          <div style={{ marginTop: 8, display: "flex", gap: 12, flexWrap: "wrap" }}>
-            <div style={{ fontWeight: 700 }}>Score: {active?.score.toFixed(1)}</div>
-            <div style={{ fontSize: 13, color: "var(--text-body)" }}>
-              {/* Same two omissions as the cards above: the gaps penalty and
-                  the free-days bonus are already stated per option, so
-                  repeating them here adds nothing. */}
-              {(active?.breakdown?.penalties as Penalty[] | undefined)
-                ?.filter((p) => p.type !== "gaps_minutes")
-                .map((p, idx: number) => (
-                  <span key={idx} style={{ marginRight: 8 }}>❌ {penaltyLabel(p)}</span>
-                ))}
-              {(active?.breakdown?.bonuses as Bonus[] | undefined)
-                ?.filter((b) => b.type !== "free_days")
-                .map((b, idx: number) => (
-                  <span key={idx} style={{ marginRight: 8 }}>✅ {bonusLabel(b)}</span>
-                ))}
-            </div>
-          </div>
-
-          {/* simple per-day list view (Stage 6 can be a real grid) */}
-          <div style={{ marginTop: 10 }}>
-            <TimetableGrid meetings={meetings} startHour={8} endHour={20} />
-          </div>
-
-          {/* ---- Compare Section ---- */}
-          <div style={{ marginTop: 20, borderTop: "1px solid var(--border-subtle)", paddingTop: 16 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-              <div>
-                <div style={{ fontWeight: 700, fontSize: 16 }}>Compare Timetables</div>
-                <div style={{ fontSize: 13, color: "var(--text-muted)" }}>
-                  Pin options above, then select two to overlay and compare
-                </div>
-              </div>
-              <div style={{ fontSize: 13, color: "var(--text-subtle)" }}>{pinned.length} pinned</div>
-            </div>
-
-            {/* Pinned items list */}
-            {pinned.length > 0 && (
-              <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 8 }}>
-                {pinned.map((p) => (
-                  <div
-                    key={p.id}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 6,
-                      border: "1px solid var(--border-subtle)",
-                      borderRadius: 8,
-                      padding: "6px 10px",
-                      background: "var(--surface-2)",
-                      fontSize: 13,
-                    }}
-                  >
-                    <Input
-                      type="text"
-                      value={p.name}
-                      onChange={(e) => renamePin(p.id, e.target.value)}
-                      aria-label={`Rename ${p.name}`}
-                      className="h-auto w-36 border-0 bg-transparent p-0 text-sm font-semibold shadow-none focus-visible:ring-0"
-                    />
-                    <span style={{ fontSize: 12, color: "var(--text-subtle)" }}>{p.score.toFixed(1)}</span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => unpin(p.id)}
-                      title="Unpin"
-                      aria-label="Unpin"
-                    >
-                      <X className="size-4" aria-hidden />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Compare selectors */}
-            {pinned.length >= 2 && (
-              <div style={{ marginTop: 14, display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span
-                    style={{
-                      display: "inline-block",
-                      width: 12,
-                      height: 12,
-                      borderRadius: 3,
-                      background: "hsl(var(--cmp-a) / 0.3)",
-                      border: "1px solid hsl(var(--cmp-a) / 0.6)",
-                    }}
-                  />
-                  <Label htmlFor="compare-a" className="text-sm font-semibold">Option A:</Label>
-                  <Select
-                    value={compareA || NO_SELECTION}
-                    onValueChange={(v) => setCompareA(v === NO_SELECTION ? "" : String(v))}
-                    items={[
-                      { value: NO_SELECTION, label: "(select)" },
-                      ...pinned.map((p) => ({ value: p.id, label: p.name })),
-                    ]}
-                  >
-                    <SelectTrigger id="compare-a" size="sm" className="w-48"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={NO_SELECTION}>(select)</SelectItem>
-                      {pinned.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span
-                    style={{
-                      display: "inline-block",
-                      width: 12,
-                      height: 12,
-                      borderRadius: 3,
-                      background: "hsl(var(--cmp-b) / 0.3)",
-                      border: "1px solid hsl(var(--cmp-b) / 0.6)",
-                    }}
-                  />
-                  <Label htmlFor="compare-b" className="text-sm font-semibold">Option B:</Label>
-                  <Select
-                    value={compareB || NO_SELECTION}
-                    onValueChange={(v) => setCompareB(v === NO_SELECTION ? "" : String(v))}
-                    items={[
-                      { value: NO_SELECTION, label: "(select)" },
-                      ...pinned.map((p) => ({ value: p.id, label: p.name })),
-                    ]}
-                  >
-                    <SelectTrigger id="compare-b" size="sm" className="w-48"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={NO_SELECTION}>(select)</SelectItem>
-                      {pinned.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            )}
-
-            {/* Overlay comparison grid */}
-            {(pinnedA || pinnedB) && (
-              <div style={{ marginTop: 14 }}>
-                <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 8 }}>
-                  Hover over a class to temporarily hide the other timetable
-                </div>
-                <CompareTimetableGrid
-                  meetingsA={meetingsA}
-                  meetingsB={meetingsB}
-                  startHour={8}
-                  endHour={20}
-                />
-              </div>
-            )}
-
-            {pinned.length < 2 && (
-              <div style={{ marginTop: 12, fontSize: 13, color: "var(--text-subtle)", fontStyle: "italic" }}>
-                Pin at least 2 options to enable comparison
-              </div>
-            )}
-          </div>
+          <CompareSection
+            pinned={pinned}
+            compareA={compareA}
+            compareB={compareB}
+            onCompareA={setCompareA}
+            onCompareB={setCompareB}
+            onUnpin={unpin}
+            onRename={renamePin}
+          />
 
           </div>
         )}
