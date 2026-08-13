@@ -119,3 +119,14 @@ api/**/*.pyc
 
 # If you generate local data artifacts you DON'T want tracked, uncomment:
 # api/data/
+
+# iCloud Drive duplicates. Syncing ~/Desktop has produced "foo 2.tsx" copies
+# in this repo four times, once breaking a build and once shipping an empty
+# "components/ui 2/" directory. Ignore them so a careless `git add -A` cannot
+# commit a second copy of a source file.
+* 2.ts
+* 2.tsx
+* 2.py
+* 2.json
+* 2.css
+*\ 2/
