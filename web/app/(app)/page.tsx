@@ -303,7 +303,7 @@ export default function Home() {
   }, [didJustOptimize, result]);
   
   return (
-    <div style={{ maxWidth: 1200, margin: "0 auto", padding: "20px 24px", fontFamily: "system-ui", width: "100%" }}>
+    <div style={{ maxWidth: 1200, margin: "0 auto", padding: "20px 24px", width: "100%" }}>
       <Header
         email={email}
         loading={loading}
