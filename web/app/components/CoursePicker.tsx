@@ -263,7 +263,7 @@ export function CoursePicker(props: Readonly<{
 
       {/* Index error details */}
       {indexStatus.error && (
-        <div className="mt-6 rounded-lg bg-[var(--danger-bg)] p-3 text-xs text-[var(--danger)]">
+        <div className="mt-6 rounded-xl bg-[var(--danger-bg)] p-3 text-xs text-[var(--danger)]">
           <div className="font-semibold">Could not load course index:</div>
           <div className="mt-1">{indexStatus.error}</div>
           <div className="mt-1 text-muted-foreground">
@@ -525,7 +525,7 @@ export function CoursePicker(props: Readonly<{
             else matchingLabel = "Matching req.";
           }
           return (
-            <div key={c.course_code} className="flex justify-between gap-3 border-b border-border p-3">
+            <div key={c.course_code} className="flex justify-between gap-2 border-b border-border p-3">
               <div className="min-w-0">
                 <div className="font-semibold">
                   {c.course_code}
