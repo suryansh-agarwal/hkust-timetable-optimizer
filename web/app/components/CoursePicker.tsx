@@ -6,6 +6,8 @@ import type { CourseSections, SectionLock } from "@/lib/api";
 import { optionsFor, reconcilePins, matchingAppliesTo } from "@/lib/sectionOptions";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -256,45 +258,36 @@ export function CoursePicker(props: Readonly<{
   const indexReady = indexStatus.loaded;
 
   return (
-    <div style={{ border: "1px solid var(--border)", borderRadius: 12, padding: 16 }}>
-      <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Courses</h2>
+    <div>
+      <h2 className="text-lg font-semibold">Courses</h2>
 
       {/* Index error details */}
       {indexStatus.error && (
-        <div style={{ marginTop: 8, padding: 10, background: "var(--danger-bg)", borderRadius: 8, fontSize: 12, color: "var(--danger)" }}>
-          <div style={{ fontWeight: 600 }}>Could not load course index:</div>
-          <div style={{ marginTop: 4 }}>{indexStatus.error}</div>
-          <div style={{ marginTop: 6, color: "var(--text-muted)" }}>
+        <div className="mt-6 rounded-lg bg-[var(--danger-bg)] p-3 text-xs text-[var(--danger)]">
+          <div className="font-semibold">Could not load course index:</div>
+          <div className="mt-1">{indexStatus.error}</div>
+          <div className="mt-1 text-muted-foreground">
             Tip: Make sure the index file exists at <code>/course-index/{term}.json</code>
           </div>
         </div>
       )}
 
       {/* selected courses, each with an optional professor lock */}
-      <div style={{ marginTop: 12 }}>
-        <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Selected</div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
-          {selected.length === 0 && <div style={{ color: "var(--text-faint)" }}>No courses selected.</div>}
+      <div className="mt-6">
+        <div className="text-sm text-muted-foreground">Selected</div>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {selected.length === 0 && (
+            <div className="flex w-full items-center justify-center p-6 text-sm text-muted-foreground">
+              No courses selected.
+            </div>
+          )}
           {selected.map((code) => {
             const instructors = getCourseFromIndex(term, code)?.instructors ?? [];
             const onlyOne = instructors.length === 1;
             return (
-              <div
-                key={code}
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 6,
-                  border: "1px solid var(--border-subtle)",
-                  borderRadius: 10,
-                  padding: "8px 10px",
-                  background: "var(--surface-2)",
-                  fontSize: 13,
-                  minWidth: 200,
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "space-between" }}>
-                  <span style={{ fontWeight: 600 }}>{code}</span>
+              <Card key={code} size="sm" className="min-w-[200px] bg-muted px-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-semibold">{code}</span>
                   <Button
                     variant="ghost"
                     size="icon"
@@ -354,7 +347,7 @@ export function CoursePicker(props: Readonly<{
                       ) : null;
                     }
                     return instructors.length > 0 ? (
-                      <div style={{ fontSize: 11, color: "var(--text-faint)" }}>Loading sections…</div>
+                      <div className="text-xs text-muted-foreground">Loading sections…</div>
                     ) : null;
                   }
 
@@ -475,15 +468,15 @@ export function CoursePicker(props: Readonly<{
 
                   return <>{rows}</>;
                 })()}
-              </div>
+              </Card>
             );
           })}
         </div>
       </div>
 
       {/* search */}
-      <div style={{ marginTop: 14 }}>
-        <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 6 }}>Search and add courses</div>
+      <div className="mt-6">
+        <div className="mb-2 text-sm text-muted-foreground">Search and add courses</div>
         <div
           className={`flex items-center gap-2 rounded-xl border border-border px-3 py-2 ${indexReady ? "bg-card" : "bg-muted"}`}
         >
@@ -496,36 +489,27 @@ export function CoursePicker(props: Readonly<{
             className="h-auto border-0 bg-transparent p-0 shadow-none focus-visible:border-0 focus-visible:ring-0"
           />
         </div>
-        <div style={{ marginTop: 6, fontSize: 12, color: "var(--text-subtle)" }}>
+        <div className="mt-1 text-xs text-muted-foreground">
           Tip: Use course codes for the fastest results.
         </div>
 
         {/* list */}
-        <div
-          style={{
-            marginTop: 10,
-            maxHeight: 320,
-            overflow: "auto",
-            border: "1px solid var(--border-subtle)",
-            borderRadius: 10,
-            background: "var(--surface)",
-          }}
-        >
+        <div className="mt-2 max-h-80 overflow-auto rounded-xl border border-border bg-card">
           {!indexReady && !indexStatus.error && !indexLoading && (
-            <div style={{ padding: 12, color: "var(--text-faint)" }}>
+            <div className="p-3 text-sm text-muted-foreground">
               Index not loaded yet.
             </div>
           )}
           {indexLoading && (
-            <div style={{ padding: 12, color: "var(--text-muted)" }}>Loading course index...</div>
+            <div className="p-3 text-sm text-muted-foreground">Loading course index...</div>
           )}
           {indexReady && q.trim() === "" && (
-            <div style={{ padding: 12, color: "var(--text-faint)" }}>
+            <div className="flex items-center justify-center p-6 text-sm text-muted-foreground">
               Start typing to search courses.
             </div>
           )}
           {indexReady && q.trim() !== "" && results.length === 0 && (
-            <div style={{ padding: 12, color: "var(--text-faint)" }}>
+            <div className="flex items-center justify-center p-6 text-sm text-muted-foreground">
               No results found.
             </div>
           )}
@@ -541,29 +525,22 @@ export function CoursePicker(props: Readonly<{
             else matchingLabel = "Matching req.";
           }
           return (
-            <div key={c.course_code} style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: 10, borderBottom: "1px solid var(--border-faint)" }}>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontWeight: 800 }}>
+            <div key={c.course_code} className="flex justify-between gap-3 border-b border-border p-3">
+              <div className="min-w-0">
+                <div className="font-semibold">
                   {c.course_code}
                   {matchingLabel && (
-                    <span
-                      style={{
-                        marginLeft: 8,
-                        fontSize: 10,
-                        fontWeight: 600,
-                        background: "var(--warn-bg)",
-                        color: "var(--warn-text)",
-                        padding: "2px 6px",
-                        borderRadius: 4,
-                      }}
+                    <Badge
+                      variant="secondary"
+                      className="ml-2"
                       title={c.header_remarks?.join(" | ") ?? "Matching between lecture and section required"}
                     >
                       {matchingLabel}
-                    </span>
+                    </Badge>
                   )}
                 </div>
-                <div style={{ fontSize: 12, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.title}</div>
-                <div style={{ fontSize: 11, color: "var(--text-subtle)", marginTop: 2 }}>
+                <div className="truncate text-xs text-muted-foreground">{c.title}</div>
+                <div className="mt-1 text-xs text-muted-foreground">
                   {c.subject ? `${c.subject} • ` : ""}{c.units ?? "-"} units
                 </div>
               </div>
