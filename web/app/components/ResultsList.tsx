@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { TimetableGrid } from "./TimetableGrid";
 import { ResultCard, type OptimizerResult } from "./ResultCard";
+import { Badge } from "@/components/ui/badge";
 import { flattenSchedule, penaltyLabel, bonusLabel, type Bonus, type Penalty } from "@/lib/schedule";
 
 export function ResultsList({
@@ -25,24 +26,30 @@ export function ResultsList({
   const active = results[activeIdx];
   const meetings = useMemo(() => (active ? flattenSchedule(active.schedule) : []), [active]);
 
+  // The best score is a property of the set, not of any one card, so it is
+  // computed once here and passed down - ResultCard has no business reaching
+  // for its siblings to find out where it stands.
+  const bestScore = results.length > 0 ? Math.max(...results.map((r) => r.score)) : 0;
+
   return (
     <>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+      <div className="flex items-center justify-between gap-2">
         <div>
-          <div style={{ fontWeight: 700 }}>Results</div>
-          <div style={{ fontSize: 13, color: "var(--text-muted)" }}>
+          <h2 className="text-lg font-semibold">Results</h2>
+          <div className="mt-1 text-sm text-muted-foreground">
             considered {considered}, returned {returned}
           </div>
         </div>
       </div>
 
       {/* Schedule cards */}
-      <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 12 }}>
+      <div className="mt-6 grid grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-4">
         {results.map((r, i: number) => (
           <ResultCard
             key={i}
             result={r}
             index={i}
+            bestScore={bestScore}
             isActive={i === activeIdx}
             isPinned={isPinned(i)}
             onSelect={() => onSelectIdx(i)}
@@ -51,27 +58,27 @@ export function ResultsList({
         ))}
       </div>
 
-      <div style={{ marginTop: 8, display: "flex", gap: 12, flexWrap: "wrap" }}>
-        <div style={{ fontWeight: 700 }}>Score: {active?.score.toFixed(1)}</div>
-        <div style={{ fontSize: 13, color: "var(--text-body)" }}>
+      <div className="mt-6 flex flex-wrap items-center gap-4">
+        <div className="text-sm font-semibold">Score: {active?.score.toFixed(1)}</div>
+        <div className="flex flex-wrap gap-2">
           {/* Same two omissions as the cards above: the gaps penalty and
               the free-days bonus are already stated per option, so
               repeating them here adds nothing. */}
           {(active?.breakdown?.penalties as Penalty[] | undefined)
             ?.filter((p) => p.type !== "gaps_minutes")
             .map((p, idx: number) => (
-              <span key={idx} style={{ marginRight: 8 }}>❌ {penaltyLabel(p)}</span>
+              <Badge key={idx} variant="destructive">❌ {penaltyLabel(p)}</Badge>
             ))}
           {(active?.breakdown?.bonuses as Bonus[] | undefined)
             ?.filter((b) => b.type !== "free_days")
             .map((b, idx: number) => (
-              <span key={idx} style={{ marginRight: 8 }}>✅ {bonusLabel(b)}</span>
+              <Badge key={idx} variant="secondary">✅ {bonusLabel(b)}</Badge>
             ))}
         </div>
       </div>
 
       {/* simple per-day list view (Stage 6 can be a real grid) */}
-      <div style={{ marginTop: 10 }}>
+      <div className="mt-6">
         <TimetableGrid meetings={meetings} startHour={8} endHour={20} />
       </div>
     </>
