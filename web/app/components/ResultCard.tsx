@@ -14,10 +14,18 @@ export type OptimizerResult = {
   schedule: unknown[];
 };
 
+/**
+ * The narrowest score spread the bar will stretch across. Below this the set
+ * is treated as "these are all much of a muchness" and the bars stay close,
+ * rather than magnifying a rounding difference into a visual gulf.
+ */
+const MIN_SPAN = 20;
+
 export function ResultCard({
   result,
   index,
   bestScore,
+  worstScore,
   isActive,
   isPinned,
   onSelect,
@@ -26,6 +34,7 @@ export function ResultCard({
   result: OptimizerResult;
   index: number;
   bestScore: number;
+  worstScore: number;
   isActive: boolean;
   isPinned: boolean;
   onSelect: () => void;
@@ -40,11 +49,21 @@ export function ResultCard({
   const penalties = ((result.breakdown?.penalties ?? []) as Penalty[]).filter((p) => p.type !== "gaps_minutes");
   const bonuses = ((result.breakdown?.bonuses ?? []) as Bonus[]).filter((b) => b.type !== "free_days");
 
-  // Scaled against the best result rather than against the range: two options
-  // a point apart genuinely are near-identical, and normalising to the range
-  // would inflate a 1.0 difference into a full-width gap. The delta label
-  // carries the precision the bar deliberately does not.
-  const pct = bestScore > 0 ? Math.max(0, Math.min(100, (result.score / bestScore) * 100)) : 100;
+  // The bar measures how far this option falls behind the best one, against
+  // the spread of the returned set - but with a floor under that spread.
+  //
+  // Plain range-normalisation (best = full, worst = empty) would inflate a
+  // 1.0 difference into a full-width gap and tell a student two near-identical
+  // schedules are far apart. MIN_SPAN stops that: while the whole set sits
+  // within 20 points, the bars stay close together, which is the honest
+  // picture. Once the set genuinely spreads wider, the bars spread with it.
+  //
+  // Dividing by bestScore instead does not work: scores are a base with
+  // penalties subtracted, so they reach zero and go negative on constrained
+  // searches. A real run returned 0.0/-1.0/-13.0/-16.0/-19.0/-25.0, where any
+  // ratio against the best is meaningless.
+  const span = Math.max(bestScore - worstScore, MIN_SPAN);
+  const pct = Math.max(0, Math.min(100, 100 * (1 - (bestScore - result.score) / span)));
   const delta = result.score - bestScore;
 
   return (

@@ -30,6 +30,7 @@ export function ResultsList({
   // computed once here and passed down - ResultCard has no business reaching
   // for its siblings to find out where it stands.
   const bestScore = results.length > 0 ? Math.max(...results.map((r) => r.score)) : 0;
+  const worstScore = results.length > 0 ? Math.min(...results.map((r) => r.score)) : 0;
 
   return (
     <>
@@ -50,6 +51,7 @@ export function ResultsList({
             result={r}
             index={i}
             bestScore={bestScore}
+            worstScore={worstScore}
             isActive={i === activeIdx}
             isPinned={isPinned(i)}
             onSelect={() => onSelectIdx(i)}
