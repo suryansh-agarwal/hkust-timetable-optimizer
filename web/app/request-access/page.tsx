@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 
 function RequestAccessContent() {
   const supabase = createClient();
@@ -36,63 +37,24 @@ function RequestAccessContent() {
   }
 
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        display: "grid",
-        placeItems: "center",
-        padding: 24,
-        background: "var(--login-canvas)",
-      }}
-    >
-      <div
-        style={{
-          width: "100%",
-          maxWidth: 560,
-          background: "var(--surface)",
-          borderRadius: 16,
-          padding: 28,
-          boxShadow: "var(--shadow-lg)",
-          border: "1px solid var(--border)",
-          textAlign: "center",
-        }}
-      >
+    <main className="grid min-h-screen place-items-center p-6 [background:var(--login-canvas)]">
+      <Card className="w-full max-w-xl p-5 text-center">
         <div
-          style={{
-            width: 56,
-            height: 56,
-            borderRadius: 16,
-            background: "var(--login-badge)",
-            display: "grid",
-            placeItems: "center",
-            color: "var(--primary-foreground)",
-            fontWeight: 800,
-            fontSize: 22,
-            margin: "0 auto",
-          }}
+          className="mx-auto flex size-14 items-center justify-center rounded-xl bg-[var(--login-badge)] text-2xl font-semibold text-primary-foreground"
           aria-hidden
         >
           ✓
         </div>
-        <h1 style={{ margin: "16px 0 6px", fontSize: 26, fontWeight: 800 }}>Access pending</h1>
-        <div style={{ color: "var(--text-muted)", fontSize: 14 }}>
-          You’re signed in, but not on the early-access list yet.
+
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Access pending</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            You’re signed in, but not on the early-access list yet.
+          </p>
         </div>
 
-        <div
-          style={{
-            marginTop: 18,
-            border: "1px solid var(--border)",
-            borderRadius: 12,
-            padding: 14,
-            background: "var(--surface-2)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 10,
-          }}
-        >
-          <div style={{ fontWeight: 700, color: "var(--text-strong)", fontSize: 14 }}>
+        <div className="flex items-center justify-between gap-4 rounded-xl border border-border bg-muted p-3">
+          <div className="text-sm font-semibold text-foreground">
             {email || "your email"}
           </div>
           <Button
@@ -105,20 +67,22 @@ function RequestAccessContent() {
           </Button>
         </div>
 
-        <div style={{ marginTop: 18, fontSize: 14, color: "var(--text-body)" }}>
-          Send this email to the admin to request access.
-        </div>
-        <div style={{ marginTop: 6, fontSize: 13, color: "var(--text-muted)" }}>
-          You’ll be approved quickly once verified.
+        <div>
+          <p className="text-sm text-foreground">
+            Send this email to the admin to request access.
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            You’ll be approved quickly once verified.
+          </p>
         </div>
 
-        <div style={{ marginTop: 18, fontSize: 13, color: "var(--text-muted)" }}>
+        <p className="text-sm text-muted-foreground">
           Need to switch accounts?{" "}
-          <a href="/login" style={{ color: "var(--primary)", fontWeight: 700, textDecoration: "none" }}>
+          <a href="/login" className="font-semibold text-primary no-underline">
             Back to login
           </a>
-        </div>
-      </div>
+        </p>
+      </Card>
     </main>
   );
 }

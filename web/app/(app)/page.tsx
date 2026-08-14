@@ -29,6 +29,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Card } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -303,7 +304,7 @@ export default function Home() {
   }, [didJustOptimize, result]);
   
   return (
-    <div style={{ maxWidth: 1200, margin: "0 auto", padding: "20px 24px", fontFamily: "system-ui", width: "100%" }}>
+    <div className="mx-auto w-full max-w-6xl px-6 py-5">
       <Header
         email={email}
         loading={loading}
@@ -311,10 +312,10 @@ export default function Home() {
         onShowHelp={() => setShowHelp(true)}
         onOptimize={runOptimize}
       />
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
-        <div style={{ border: "1px solid var(--border)", borderRadius: 12, padding: 14 }}>
+      <div className="mt-6 grid grid-cols-2 gap-4">
+        <Card className="p-5">
           <div className="mb-3">
-            <Label htmlFor="term-select" className="mb-2 block text-sm">Term</Label>
+            <Label htmlFor="term-select" className="mb-2 block text-sm font-semibold">Term</Label>
             <Select
               value={term}
               onValueChange={(v) => handleTermChange(String(v))}
@@ -340,17 +341,17 @@ export default function Home() {
             sectionLocks={sectionLocks}
             setSectionLocks={setSectionLocks}
           />
-          <div style={{ marginTop: 8, fontSize: 14 }}>
-            <b>Selected:</b> {selectedCourses.join(", ")}
-          </div>
-        </div>
+          <p className="mt-1 text-sm">
+            <span className="font-semibold">Selected:</span> {selectedCourses.join(", ")}
+          </p>
+        </Card>
 
         <PreferencesPanel hard={hard} soft={soft} weights={weights} error={error} />
       </div>
 
-      <div ref={resultsRef} id="results" style={{ scrollMarginTop: 90 }}>
+      <div ref={resultsRef} id="results" className="scroll-mt-[90px]">
         {result && (
-          <div style={{ marginTop: 14, border: "1px solid var(--border)", borderRadius: 12, padding: 14 }}>
+          <div className="mt-6 space-y-6">
           <ResultsList
             results={result.results}
             considered={result.considered}

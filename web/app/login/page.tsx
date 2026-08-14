@@ -5,6 +5,8 @@ import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Card } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 
 function LoginContent() {
   const supabase = createClient();
@@ -20,7 +22,7 @@ function LoginContent() {
     setErr(null);
     setNotice(null);
     setLoadingGoogle(true);
-  
+
     const siteUrl =
     process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin;
 
@@ -71,60 +73,32 @@ function LoginContent() {
       setLoadingEmail(false);
     }
   }
-  
-  
+
+
 
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        display: "grid",
-        placeItems: "center",
-        padding: 24,
-        background: "var(--login-canvas)",
-      }}
-    >
-      <div
-        style={{
-          width: "100%",
-          maxWidth: 520,
-          background: "var(--surface)",
-          borderRadius: 16,
-          padding: 28,
-          boxShadow: "var(--shadow-lg)",
-          border: "1px solid var(--border)",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+    <main className="grid min-h-screen place-items-center p-6 [background:var(--login-canvas)]">
+      <Card className="w-full max-w-lg p-5">
+        <div className="flex items-center gap-4">
           <div
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: 12,
-              background: "var(--login-badge)",
-              display: "grid",
-              placeItems: "center",
-              color: "var(--primary-foreground)",
-              fontWeight: 800,
-              fontSize: 18,
-            }}
+            className="flex size-11 items-center justify-center rounded-xl bg-[var(--login-badge)] text-primary-foreground"
             aria-hidden
           >
             <img
               src="/login/calendar-icon.png"
               alt="Calendar icon"
-              style={{ width: 24, height: 24, display: "block" }}
+              className="block size-6"
             />
           </div>
           <div>
-            <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800 }}>Welcome back</h1>
-            <div style={{ color: "var(--text-muted)", marginTop: 4, fontSize: 14 }}>
+            <h1 className="text-2xl font-semibold tracking-tight">Welcome back</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
               Sign in to build your best timetable
-            </div>
+            </p>
           </div>
         </div>
 
-        <div style={{ marginTop: 20, display: "grid", gap: 12 }}>
+        <div className="grid gap-4">
           <Button
             onClick={continueWithGoogle}
             disabled={loadingGoogle}
@@ -138,22 +112,12 @@ function LoginContent() {
             </svg>
             {loadingGoogle ? "Redirecting..." : "Continue with Google"}
           </Button>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-              color: "var(--text-muted)",
-              fontSize: 12,
-              fontWeight: 700,
-            }}
-            aria-hidden
-          >
-            <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
-            <span>--- Or ---</span>
-            <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
+          <div className="flex items-center gap-2" aria-hidden>
+            <Separator className="flex-1" />
+            <span className="text-xs font-semibold text-muted-foreground">--- Or ---</span>
+            <Separator className="flex-1" />
           </div>
-          <form onSubmit={continueWithEmail} style={{ display: "grid", gap: 10 }}>
+          <form onSubmit={continueWithEmail} className="grid gap-2">
             <Input
               type="email"
               value={emailInput}
@@ -172,11 +136,19 @@ function LoginContent() {
               {loadingEmail ? "Sending..." : "Continue with email"}
             </Button>
           </form>
-          {err && <div style={{ marginTop: 6, color: "var(--danger)", fontWeight: 600 }}>Error: {err}</div>}
-          {notice && <div style={{ marginTop: 6, color: "var(--pin-text)", fontWeight: 600 }}>{notice}</div>}
+          {err && (
+            <div className="rounded-xl border border-[var(--danger-border)] bg-[var(--danger-bg)] p-3 text-sm text-[var(--danger)]">
+              Error: {err}
+            </div>
+          )}
+          {notice && (
+            <div className="rounded-xl border border-[var(--success-border)] bg-[var(--success-bg)] p-3 text-sm text-[var(--pin-text)]">
+              {notice}
+            </div>
+          )}
         </div>
 
-      </div>
+      </Card>
     </main>
   );
 }
