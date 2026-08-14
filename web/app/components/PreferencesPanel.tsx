@@ -244,7 +244,7 @@ export function PreferencesPanel({
       </div>
 
       {error && (
-        <div className="mt-2 whitespace-pre-wrap rounded-xl border border-[var(--danger-border)] bg-[var(--danger-bg)] p-3 text-sm text-[var(--danger)]">
+        <div className="mt-6 whitespace-pre-wrap rounded-xl border border-[var(--danger-border)] bg-[var(--danger-bg)] p-3 text-sm text-[var(--danger)]">
           {error}
         </div>
       )}
