@@ -69,7 +69,13 @@ export function ResultsList({
           {(active?.breakdown?.penalties as Penalty[] | undefined)
             ?.filter((p) => p.type !== "gaps_minutes")
             .map((p, idx: number) => (
-              <Badge key={idx} variant="destructive">❌ {penaltyLabel(p)}</Badge>
+              <Badge
+                key={idx}
+                variant="outline"
+                className="border-[var(--danger-border)] bg-[var(--danger-chip-bg)] text-[var(--danger)]"
+              >
+                ❌ {penaltyLabel(p)}
+              </Badge>
             ))}
           {(active?.breakdown?.bonuses as Bonus[] | undefined)
             ?.filter((b) => b.type !== "free_days")

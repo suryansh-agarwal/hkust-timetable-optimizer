@@ -18,6 +18,10 @@ export type OptimizerResult = {
  * The narrowest score spread the bar will stretch across. Below this the set
  * is treated as "these are all much of a muchness" and the bars stay close,
  * rather than magnifying a rounding difference into a visual gulf.
+ *
+ * With no soft preferences set, the only live scoring term is
+ * -gaps_minutes * 0.10, so 20 points is roughly 200 minutes of gap
+ * difference between the best and worst option in the set.
  */
 const MIN_SPAN = 20;
 
@@ -63,7 +67,10 @@ export function ResultCard({
   // searches. A real run returned 0.0/-1.0/-13.0/-16.0/-19.0/-25.0, where any
   // ratio against the best is meaningless.
   const span = Math.max(bestScore - worstScore, MIN_SPAN);
-  const pct = Math.max(0, Math.min(100, 100 * (1 - (bestScore - result.score) / span)));
+  // Floored at 2 so the worst option in a wide-spread set still renders a
+  // visible sliver inside the overflow-hidden track, instead of a 0%-width
+  // fill that reads as "nothing here" rather than "ranked last".
+  const pct = Math.max(2, Math.min(100, 100 * (1 - (bestScore - result.score) / span)));
   const delta = result.score - bestScore;
 
   return (
@@ -130,7 +137,12 @@ export function ResultCard({
       {/* quick breakdown chips */}
       <div className="flex flex-wrap gap-2">
         {penalties.slice(0, 3).map((p, idx: number) => (
-          <Badge key={`p-${idx}`} variant="destructive" title={JSON.stringify(p)}>
+          <Badge
+            key={`p-${idx}`}
+            variant="outline"
+            className="border-[var(--danger-border)] bg-[var(--danger-chip-bg)] text-[var(--danger)]"
+            title={JSON.stringify(p)}
+          >
             ❌ {penaltyLabel(p)}
           </Badge>
         ))}
