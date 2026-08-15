@@ -304,7 +304,7 @@ export default function Home() {
   }, [didJustOptimize, result]);
   
   return (
-    <div className="mx-auto w-full max-w-6xl px-6 py-5">
+    <div className="mx-auto w-full max-w-6xl px-4 py-5 lg:px-6">
       <Header
         email={email}
         loading={loading}
@@ -312,7 +312,7 @@ export default function Home() {
         onShowHelp={() => setShowHelp(true)}
         onOptimize={runOptimize}
       />
-      <div className="mt-6 grid grid-cols-2 gap-4">
+      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card className="p-5">
           <div className="mb-3">
             <Label htmlFor="term-select" className="mb-2 block text-sm font-semibold">Term</Label>
