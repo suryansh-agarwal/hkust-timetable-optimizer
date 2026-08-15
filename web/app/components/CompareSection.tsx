@@ -144,12 +144,16 @@ export function CompareSection({
             <div className="mb-2 text-sm text-muted-foreground">
               Hover over a class to temporarily hide the other timetable
             </div>
-            <CompareTimetableGrid
-              meetingsA={meetingsA}
-              meetingsB={meetingsB}
-              startHour={8}
-              endHour={20}
-            />
+            <div className="overflow-x-auto">
+              <div className="min-w-[720px]">
+                <CompareTimetableGrid
+                  meetingsA={meetingsA}
+                  meetingsB={meetingsB}
+                  startHour={8}
+                  endHour={20}
+                />
+              </div>
+            </div>
           </div>
         )}
 
