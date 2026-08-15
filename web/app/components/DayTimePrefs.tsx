@@ -94,7 +94,7 @@ export function DayTimeGroup({
               disabled={!values[d].enabled}
               onValueChange={(v) => onChange({ ...values, [d]: { ...values[d], time: String(v) } })}
             >
-              <SelectTrigger size="sm" className="w-28">
+              <SelectTrigger size="sm" className="w-full lg:w-28">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

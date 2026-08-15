@@ -63,7 +63,7 @@ export function CompareSection({
                   value={p.name}
                   onChange={(e) => onRename(p.id, e.target.value)}
                   aria-label={`Rename ${p.name}`}
-                  className="h-auto w-36 border-0 bg-transparent p-0 text-sm font-semibold shadow-none focus-visible:ring-0"
+                  className="h-auto w-full border-0 bg-transparent p-0 text-sm font-semibold shadow-none focus-visible:ring-0 lg:w-36"
                 />
                 <span className="text-xs text-muted-foreground">{p.score.toFixed(1)}</span>
                 <Button
@@ -100,7 +100,7 @@ export function CompareSection({
                   ...pinned.map((p) => ({ value: p.id, label: p.name })),
                 ]}
               >
-                <SelectTrigger id="compare-a" size="sm" className="w-48"><SelectValue /></SelectTrigger>
+                <SelectTrigger id="compare-a" size="sm" className="w-full lg:w-48"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value={NO_SELECTION}>(select)</SelectItem>
                   {pinned.map((p) => (
@@ -126,7 +126,7 @@ export function CompareSection({
                   ...pinned.map((p) => ({ value: p.id, label: p.name })),
                 ]}
               >
-                <SelectTrigger id="compare-b" size="sm" className="w-48"><SelectValue /></SelectTrigger>
+                <SelectTrigger id="compare-b" size="sm" className="w-full lg:w-48"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value={NO_SELECTION}>(select)</SelectItem>
                   {pinned.map((p) => (

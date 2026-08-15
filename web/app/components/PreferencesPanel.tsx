@@ -214,13 +214,13 @@ export function PreferencesPanel({
       <div>
         <div className="mb-2 text-sm font-semibold">Weights & style</div>
         <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-2 text-sm text-foreground">
-            <span className="w-36">Gap penalty:</span>
+          <div className="flex flex-col gap-1 text-sm text-foreground lg:flex-row lg:items-center lg:gap-2">
+            <span className="lg:w-36">Gap penalty:</span>
             <Select
               value={weights.gapWeightPreset}
               onValueChange={(v) => weights.setGapWeightPreset(v as WeightPreset)}
             >
-              <SelectTrigger size="sm" className="w-28"><SelectValue /></SelectTrigger>
+              <SelectTrigger size="sm" className="w-full lg:w-28"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="Low">Low</SelectItem>
                 <SelectItem value="Med">Med</SelectItem>
@@ -228,13 +228,13 @@ export function PreferencesPanel({
               </SelectContent>
             </Select>
           </div>
-          <div className="flex items-center gap-2 text-sm text-foreground">
-            <span className="w-36">Early/late penalty:</span>
+          <div className="flex flex-col gap-1 text-sm text-foreground lg:flex-row lg:items-center lg:gap-2">
+            <span className="lg:w-36">Early/late penalty:</span>
             <Select
               value={weights.earlyLateWeightPreset}
               onValueChange={(v) => weights.setEarlyLateWeightPreset(v as WeightPreset)}
             >
-              <SelectTrigger size="sm" className="w-28"><SelectValue /></SelectTrigger>
+              <SelectTrigger size="sm" className="w-full lg:w-28"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="Low">Low</SelectItem>
                 <SelectItem value="Med">Med</SelectItem>
@@ -242,8 +242,8 @@ export function PreferencesPanel({
               </SelectContent>
             </Select>
           </div>
-          <div className="flex items-center gap-2 text-sm text-foreground">
-            <span className="w-36">Gap shape:</span>
+          <div className="flex flex-col gap-1 text-sm text-foreground lg:flex-row lg:items-center lg:gap-2">
+            <span className="lg:w-36">Gap shape:</span>
             <Select
               value={weights.gapShape}
               onValueChange={(v) => weights.setGapShape(v as GapShape)}
@@ -253,7 +253,7 @@ export function PreferencesPanel({
                 { value: "fragmented", label: "Prefer several short gaps" },
               ]}
             >
-              <SelectTrigger size="sm" className="w-56"><SelectValue /></SelectTrigger>
+              <SelectTrigger size="sm" className="w-full lg:w-56"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="no_preference">No preference</SelectItem>
                 <SelectItem value="consolidated">Prefer one long gap</SelectItem>

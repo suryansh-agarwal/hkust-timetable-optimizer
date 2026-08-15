@@ -24,7 +24,7 @@ export function Header({
         <p className="mt-1 text-sm text-muted-foreground">Build a schedule with soft and hard preferences</p>
         <p className="mt-1 text-sm"><span className="font-semibold">Logged in as:</span> {email}</p>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <ThemeToggle />
         <a
           href="https://docs.google.com/forms/d/e/1FAIpQLSdUPWeLVqBYbBbZunz-tPnI3mvgGDgKN2onmYPKlZ13OcwNUA/viewform?usp=publish-editor"
