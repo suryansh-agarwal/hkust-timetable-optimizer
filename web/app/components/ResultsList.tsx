@@ -34,12 +34,10 @@ export function ResultsList({
 
   return (
     <>
-      <div className="flex items-center justify-between gap-2">
-        <div>
-          <h2 className="text-lg font-semibold">Results</h2>
-          <div className="mt-1 text-sm text-muted-foreground">
-            considered {considered}, returned {returned}
-          </div>
+      <div>
+        <h2 className="text-lg font-semibold">Results</h2>
+        <div className="mt-1 text-sm text-muted-foreground">
+          considered {considered}, returned {returned}
         </div>
       </div>
 

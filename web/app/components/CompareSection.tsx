@@ -41,7 +41,7 @@ export function CompareSection({
   const meetingsB = useMemo(() => (pinnedB ? flattenSchedule(pinnedB.schedule) : []), [pinnedB]);
 
   return (
-    <Card>
+    <Card className="p-5">
       <CardHeader>
         <h2 className="text-lg font-semibold">Compare Timetables</h2>
         <CardDescription>
