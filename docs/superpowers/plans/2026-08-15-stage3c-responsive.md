@@ -574,13 +574,25 @@ min-w-[720px] wrapper gives it a width to fill."
 ### Task 6: Make the fixed control widths fluid
 
 **Files:**
-- Modify: `web/app/components/PreferencesPanel.tsx`, `web/app/components/CompareSection.tsx`, `web/app/components/DayTimePrefs.tsx`, `web/app/components/CoursePicker.tsx`
+- Modify: `web/app/components/Header.tsx`, `web/app/components/PreferencesPanel.tsx`, `web/app/components/CompareSection.tsx`, `web/app/components/DayTimePrefs.tsx`, `web/app/components/CoursePicker.tsx`
 
 **Interfaces:**
 - Consumes: nothing.
 - Produces: nothing.
 
 Several controls carry fixed widths that fit a half-width column but overflow a 375px one.
+
+- [ ] **Step 0: The header button row**
+
+Task 3 measured the page at 375px and found `scrollWidth: 538` against `clientWidth: 375`. The cause is not the container it changed: `Header.tsx:27`'s button group is `flex items-center gap-2` with no wrap, holding the three-segment theme toggle plus Feedback, How to use? and Optimize — **523px in one un-wrapped row.**
+
+`Header.tsx:21`'s outer row already wraps. The inner group needs the same:
+
+```tsx
+      <div className="flex flex-wrap items-center gap-2">
+```
+
+This is the single largest contributor to the page's horizontal overflow, so do it first and re-measure before touching anything else — the remaining widths matter much less once 523px comes down.
 
 - [ ] **Step 1: The weights row**
 
@@ -636,10 +648,11 @@ At **375 × 812**: no control overflows its container, and the page still does n
 - [ ] **Step 7: Commit**
 
 ```bash
-git add web/app/components/PreferencesPanel.tsx web/app/components/CompareSection.tsx web/app/components/DayTimePrefs.tsx web/app/components/CoursePicker.tsx
+git add web/app/components/Header.tsx web/app/components/PreferencesPanel.tsx web/app/components/CompareSection.tsx web/app/components/DayTimePrefs.tsx web/app/components/CoursePicker.tsx
 git commit -m "feat(web): make the fixed control widths fluid below lg
 
-The weights row's 144px labels and 224px select, the 192px compare
+The header button row was 523px un-wrapped, the single largest contributor
+to the page overflowing 375px. The weights rows 144px labels and 224px select, the 192px compare
 selects and the 112px time selects fit a half-width column and overflow a
 375px one. Each keeps its width above lg and fills its container below."
 ```
