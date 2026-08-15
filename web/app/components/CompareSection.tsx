@@ -69,6 +69,7 @@ export function CompareSection({
                 <Button
                   variant="ghost"
                   size="icon"
+                  className="min-h-11 lg:min-h-0"
                   onClick={() => onUnpin(p.id)}
                   title="Unpin"
                   aria-label="Unpin"

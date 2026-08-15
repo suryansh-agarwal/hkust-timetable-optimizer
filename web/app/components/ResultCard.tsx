@@ -89,6 +89,7 @@ export function ResultCard({
         <Button
           variant={isPinned ? "default" : "outline"}
           size="sm"
+          className="min-h-11 lg:min-h-0"
           onClick={(e) => {
             e.stopPropagation();
             onPin();

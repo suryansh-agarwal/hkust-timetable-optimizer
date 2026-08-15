@@ -291,6 +291,7 @@ export function CoursePicker(props: Readonly<{
                   <Button
                     variant="ghost"
                     size="icon"
+                    className="min-h-11 lg:min-h-0"
                     onClick={() => remove(code)}
                     aria-label={`Remove ${code}`}
                     title="Remove"
@@ -549,7 +550,7 @@ export function CoursePicker(props: Readonly<{
                 size="sm"
                 onClick={() => (on ? remove(c.course_code) : add(c.course_code))}
                 disabled={on}
-                className="shrink-0"
+                className="min-h-11 shrink-0 lg:min-h-0"
               >
                 {on ? "Added" : "+ Add"}
               </Button>
