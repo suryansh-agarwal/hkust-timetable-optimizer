@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Info } from "lucide-react";
+import { ChevronDown, Info } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -58,12 +58,19 @@ export function PreferencesPanel({
         <Card size="sm">
           <Collapsible
             defaultOpen={openByDefault}
+            // defaultOpen is only read on mount, so changing this key forces
+            // the Collapsible to remount and pick up the new default once the
+            // breakpoint effect above resolves.
             key={`hard-${openByDefault}`}
             className="flex flex-col gap-(--card-spacing)"
           >
             <CardHeader>
-              <CollapsibleTrigger className="flex w-full items-center justify-between text-left">
+              <CollapsibleTrigger className="group flex min-h-11 w-full items-center justify-between text-left lg:min-h-0">
                 <CardTitle className="text-sm font-semibold">Hard preferences</CardTitle>
+                <ChevronDown
+                  className="size-4 shrink-0 transition-transform group-data-[panel-open]:rotate-180"
+                  aria-hidden
+                />
               </CollapsibleTrigger>
               <CardAction>
                 <Dialog>
@@ -135,12 +142,19 @@ export function PreferencesPanel({
         <Card size="sm">
           <Collapsible
             defaultOpen={openByDefault}
+            // defaultOpen is only read on mount, so changing this key forces
+            // the Collapsible to remount and pick up the new default once the
+            // breakpoint effect above resolves.
             key={`soft-${openByDefault}`}
             className="flex flex-col gap-(--card-spacing)"
           >
             <CardHeader>
-              <CollapsibleTrigger className="flex w-full items-center justify-between text-left">
+              <CollapsibleTrigger className="group flex min-h-11 w-full items-center justify-between text-left lg:min-h-0">
                 <CardTitle className="text-sm font-semibold">Soft preferences</CardTitle>
+                <ChevronDown
+                  className="size-4 shrink-0 transition-transform group-data-[panel-open]:rotate-180"
+                  aria-hidden
+                />
               </CollapsibleTrigger>
               <CardAction>
                 <Dialog>

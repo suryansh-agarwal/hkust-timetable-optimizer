@@ -41,7 +41,7 @@ export function CompareSection({
   const meetingsB = useMemo(() => (pinnedB ? flattenSchedule(pinnedB.schedule) : []), [pinnedB]);
 
   return (
-    <Card className="p-5">
+    <Card className="py-5">
       <CardHeader>
         <h2 className="text-lg font-semibold">Compare Timetables</h2>
         <CardDescription>
@@ -69,7 +69,7 @@ export function CompareSection({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="min-h-11 lg:min-h-0"
+                  className="min-h-11 min-w-11 lg:min-h-0 lg:min-w-0"
                   onClick={() => onUnpin(p.id)}
                   title="Unpin"
                   aria-label="Unpin"

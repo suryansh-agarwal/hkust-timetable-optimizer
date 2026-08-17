@@ -3,6 +3,7 @@
 import { MessageSquare } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { cn } from "@/lib/utils";
 
 export function Header({
   email,
@@ -31,16 +32,17 @@ export function Header({
           target="_blank"
           rel="noreferrer"
           aria-label="Leave feedback"
-          className={buttonVariants({ variant: "outline", size: "sm" })}
+          className={cn(buttonVariants({ variant: "outline", size: "sm" }), "min-h-11 lg:min-h-0")}
         >
           <MessageSquare className="size-4" aria-hidden />
           Feedback
         </a>
-        <Button variant="outline" size="sm" onClick={onShowHelp}>
+        <Button variant="outline" size="sm" className="min-h-11 lg:min-h-0" onClick={onShowHelp}>
           How to use?
         </Button>
         <Button
           size="sm"
+          className="min-h-11 lg:min-h-0"
           onClick={onOptimize}
           disabled={optimizeDisabled}
         >
