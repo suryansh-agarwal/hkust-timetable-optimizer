@@ -358,7 +358,7 @@ classNames."
 
 **Files:**
 - Modify: `web/app/components/TimetableGrid.tsx`, `web/app/globals.css`
-- Test: `web/lib/__tests__/` — add `subject-ink.test.ts`
+- Test: `web/lib/subject-ink.test.ts`
 
 **Interfaces:**
 - Consumes: the chrome from Tasks 1–2.
@@ -370,7 +370,7 @@ This is the accessibility fix. Four light-mode hues fail AA as labels on their o
 
 The contrast rule is arithmetic, so it can be tested without a browser. The test **reads `globals.css`** rather than restating the hue values — a test that hard-codes them would keep passing after someone retunes a hue, which is the exact regression worth guarding against, and it would also pass before the token exists, giving no red.
 
-Create `web/lib/__tests__/subject-ink.test.ts`:
+Create `web/lib/subject-ink.test.ts` — flat in `lib/`, matching `schedule.test.ts` and `sectionOptions.test.ts`; vitest is configured `include: ["lib/**/*.test.ts"]` with `environment: "node"`, so `node:fs` works and `process.cwd()` is `web/`:
 
 ```ts
 import { readFileSync } from "node:fs";
@@ -473,7 +473,7 @@ describe("subject block ink meets WCAG AA on its own fill", () => {
 - [ ] **Step 2: Run it and watch it fail**
 
 ```bash
-cd web && npx vitest run lib/__tests__/subject-ink.test.ts
+cd web && npx vitest run lib/subject-ink.test.ts
 ```
 
 Expected: the two per-theme cases fail with **`--sub-ink-mix is not declared`**, because Step 3 has not added it yet. That is the red — the test reads the shipped stylesheet, so it cannot pass ahead of the implementation.
@@ -531,7 +531,7 @@ In both components' block markup, all three lines take `colors.ink` with **no `o
 - [ ] **Step 6: Run the test again**
 
 ```bash
-cd web && npx vitest run lib/__tests__/subject-ink.test.ts
+cd web && npx vitest run lib/subject-ink.test.ts
 ```
 
 Expected: all four pass.
@@ -558,7 +558,7 @@ cd web && rm -rf .next && ./node_modules/.bin/tsc --noEmit && npx eslint . && np
 Expected: 46 vitest tests now (42 + 4).
 
 ```bash
-git add web/app/components/TimetableGrid.tsx web/app/globals.css web/lib/__tests__/subject-ink.test.ts
+git add web/app/components/TimetableGrid.tsx web/app/globals.css web/lib/subject-ink.test.ts
 git commit -m "fix(web): bring the subject block labels up to WCAG AA
 
 Blocks put the label on a 16% wash of its own hue, so four light-mode
