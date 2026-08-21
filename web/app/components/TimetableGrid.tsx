@@ -82,17 +82,86 @@ function assignLanes<T extends Meeting>(meetings: T[]): { placed: (T & { lane: n
   return { placed, laneCount: lanes.length };
 }
 
+const GRID_START_HOUR = 8;
+const GRID_END_HOUR = 20;
+const HOUR_ROW_HEIGHT = 64; // px per hour
+
+function useGridGeometry(startHour = GRID_START_HOUR, endHour = GRID_END_HOUR) {
+  const startMin = startHour * 60;
+  const endMin = endHour * 60;
+  const pxPerMin = HOUR_ROW_HEIGHT / 60;
+  return { startHour, endHour, startMin, endMin, pxPerMin, gridHeight: (endMin - startMin) * pxPerMin };
+}
+
+function GridFrame({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
+      {children}
+    </div>
+  );
+}
+
+function GridHeaderRow() {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: `80px repeat(5, 1fr)`, background: "var(--surface-2)", borderBottom: "1px solid var(--border-subtle)" }}>
+      <div style={{ padding: 10, fontWeight: 700, fontSize: 12, color: "var(--text-muted)" }}>Time</div>
+      {DAYS.map((d) => (
+        <div key={d.key} style={{ padding: 10, fontWeight: 700 }}>{d.label}</div>
+      ))}
+    </div>
+  );
+}
+
+function TimeAxis({ startHour, endHour, startMin, pxPerMin, gridHeight }: ReturnType<typeof useGridGeometry>) {
+  return (
+    <div style={{ position: "relative", height: gridHeight, borderRight: "1px solid var(--border-subtle)" }}>
+      {Array.from({ length: endHour - startHour + 1 }).map((_, i) => {
+        const hour = startHour + i;
+        const y = (hour * 60 - startMin) * pxPerMin;
+        return (
+          <div key={hour} style={{ position: "absolute", top: y - 8, left: 10, fontSize: 12, color: "var(--text-muted)" }}>
+            {hour.toString().padStart(2, "0")}:00
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function DayColumn({ dayKey, startHour, endHour, pxPerMin, gridHeight, children }: {
+  dayKey: string;
+  startHour: number;
+  endHour: number;
+  pxPerMin: number;
+  gridHeight: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <div style={{ position: "relative", height: gridHeight, borderRight: dayKey !== "Fr" ? "1px solid var(--border-subtle)" : undefined }}>
+      {Array.from({ length: endHour - startHour }).map((_, i) => (
+        <div key={i} style={{ position: "absolute", top: i * 60 * pxPerMin, left: 0, right: 0, height: 1, background: "var(--border-faint)" }} />
+      ))}
+      {children}
+    </div>
+  );
+}
+
+// The row below the header that lays out the time axis and day columns in
+// the same 80px + 5 equal columns template GridHeaderRow uses.
+function GridBody({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: `80px repeat(5, 1fr)` }}>
+      {children}
+    </div>
+  );
+}
+
 export function TimetableGrid(props: {
   meetings: Meeting[];
   startHour?: number; // default 8
   endHour?: number;   // default 20
 }) {
-  const startHour = props.startHour ?? 8;
-  const endHour = props.endHour ?? 20;
-
-  const startMin = startHour * 60;
-  const endMin = endHour * 60;
-  const totalMin = endMin - startMin;
+  const { startHour, endHour, startMin, endMin, pxPerMin, gridHeight } = useGridGeometry(props.startHour, props.endHour);
 
   const byDay = useMemo(() => {
     const map: Record<string, Meeting[]> = {};
@@ -119,11 +188,6 @@ export function TimetableGrid(props: {
     return out;
   }, [byDay]);
 
-  // layout constants
-  const hourRowHeight = 64; // px per hour
-  const pxPerMin = hourRowHeight / 60;
-  const gridHeight = totalMin * pxPerMin;
-
   const subjectColors = useMemo(() => {
     const subjects = Array.from(
       new Set(props.meetings.map((m) => getSubjectFromCode(m.course_code)))
@@ -136,40 +200,17 @@ export function TimetableGrid(props: {
   }, [props.meetings]);
 
   return (
-    <div style={{ border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
-      {/* header */}
-      <div style={{ display: "grid", gridTemplateColumns: `80px repeat(5, 1fr)`, background: "var(--surface-2)", borderBottom: "1px solid var(--border-subtle)" }}>
-        <div style={{ padding: 10, fontWeight: 700, fontSize: 12, color: "var(--text-muted)" }}>Time</div>
-        {DAYS.map((d) => (
-          <div key={d.key} style={{ padding: 10, fontWeight: 700 }}>{d.label}</div>
-        ))}
-      </div>
+    <GridFrame>
+      <GridHeaderRow />
 
-      <div style={{ display: "grid", gridTemplateColumns: `80px repeat(5, 1fr)` }}>
-        {/* time axis */}
-        <div style={{ position: "relative", height: gridHeight, borderRight: "1px solid var(--border-subtle)" }}>
-          {Array.from({ length: endHour - startHour + 1 }).map((_, i) => {
-            const hour = startHour + i;
-            const y = (hour * 60 - startMin) * pxPerMin;
-            return (
-              <div key={hour} style={{ position: "absolute", top: y - 8, left: 10, fontSize: 12, color: "var(--text-muted)" }}>
-                {hour.toString().padStart(2, "0")}:00
-              </div>
-            );
-          })}
-        </div>
+      <GridBody>
+        <TimeAxis startHour={startHour} endHour={endHour} startMin={startMin} endMin={endMin} pxPerMin={pxPerMin} gridHeight={gridHeight} />
 
         {/* day columns */}
         {DAYS.map((d) => {
           const { placed, laneCount } = packed[d.key];
           return (
-            <div key={d.key} style={{ position: "relative", height: gridHeight, borderRight: d.key !== "Fr" ? "1px solid var(--border-subtle)" : undefined }}>
-              {/* hour lines */}
-              {Array.from({ length: endHour - startHour }).map((_, i) => {
-                const y = (i * 60) * pxPerMin;
-                return <div key={i} style={{ position: "absolute", top: y, left: 0, right: 0, height: 1, background: "var(--border-faint)" }} />;
-              })}
-
+            <DayColumn key={d.key} dayKey={d.key} startHour={startHour} endHour={endHour} pxPerMin={pxPerMin} gridHeight={gridHeight}>
               {/* blocks */}
               {placed.map((m, idx) => {
                 const top = (m.start_min - startMin) * pxPerMin;
@@ -211,11 +252,11 @@ export function TimetableGrid(props: {
                   </div>
                 );
               })}
-            </div>
+            </DayColumn>
           );
         })}
-      </div>
-    </div>
+      </GridBody>
+    </GridFrame>
   );
 }
 
@@ -226,12 +267,7 @@ export function CompareTimetableGrid(props: {
   startHour?: number;
   endHour?: number;
 }) {
-  const startHour = props.startHour ?? 8;
-  const endHour = props.endHour ?? 20;
-
-  const startMin = startHour * 60;
-  const endMin = endHour * 60;
-  const totalMin = endMin - startMin;
+  const { startHour, endHour, startMin, endMin, pxPerMin, gridHeight } = useGridGeometry(props.startHour, props.endHour);
 
   // Track which side is being hovered (null = show both)
   const [hoveredSide, setHoveredSide] = useState<"A" | "B" | null>(null);
@@ -268,49 +304,22 @@ export function CompareTimetableGrid(props: {
     return out;
   }, [byDay]);
 
-  const hourRowHeight = 64;
-  const pxPerMin = hourRowHeight / 60;
-  const gridHeight = totalMin * pxPerMin;
-
   // Color schemes
   const colorA = blockColors("--cmp-a");
   const colorB = blockColors("--cmp-b");
 
   return (
-    <div style={{ border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
-      {/* header */}
-      <div style={{ display: "grid", gridTemplateColumns: `80px repeat(5, 1fr)`, background: "var(--surface-2)", borderBottom: "1px solid var(--border-subtle)" }}>
-        <div style={{ padding: 10, fontWeight: 700, fontSize: 12, color: "var(--text-muted)" }}>Time</div>
-        {DAYS.map((d) => (
-          <div key={d.key} style={{ padding: 10, fontWeight: 700 }}>{d.label}</div>
-        ))}
-      </div>
+    <GridFrame>
+      <GridHeaderRow />
 
-      <div style={{ display: "grid", gridTemplateColumns: `80px repeat(5, 1fr)` }}>
-        {/* time axis */}
-        <div style={{ position: "relative", height: gridHeight, borderRight: "1px solid var(--border-subtle)" }}>
-          {Array.from({ length: endHour - startHour + 1 }).map((_, i) => {
-            const hour = startHour + i;
-            const y = (hour * 60 - startMin) * pxPerMin;
-            return (
-              <div key={hour} style={{ position: "absolute", top: y - 8, left: 10, fontSize: 12, color: "var(--text-muted)" }}>
-                {hour.toString().padStart(2, "0")}:00
-              </div>
-            );
-          })}
-        </div>
+      <GridBody>
+        <TimeAxis startHour={startHour} endHour={endHour} startMin={startMin} endMin={endMin} pxPerMin={pxPerMin} gridHeight={gridHeight} />
 
         {/* day columns */}
         {DAYS.map((d) => {
           const { placed, laneCount } = packed[d.key];
           return (
-            <div key={d.key} style={{ position: "relative", height: gridHeight, borderRight: d.key !== "Fr" ? "1px solid var(--border-subtle)" : undefined }}>
-              {/* hour lines */}
-              {Array.from({ length: endHour - startHour }).map((_, i) => {
-                const y = i * 60 * pxPerMin;
-                return <div key={i} style={{ position: "absolute", top: y, left: 0, right: 0, height: 1, background: "var(--border-faint)" }} />;
-              })}
-
+            <DayColumn key={d.key} dayKey={d.key} startHour={startHour} endHour={endHour} pxPerMin={pxPerMin} gridHeight={gridHeight}>
               {/* blocks */}
               {placed.map((m, idx) => {
                 const top = (m.start_min - startMin) * pxPerMin;
@@ -360,10 +369,10 @@ export function CompareTimetableGrid(props: {
                   </div>
                 );
               })}
-            </div>
+            </DayColumn>
           );
         })}
-      </div>
-    </div>
+      </GridBody>
+    </GridFrame>
   );
 }
