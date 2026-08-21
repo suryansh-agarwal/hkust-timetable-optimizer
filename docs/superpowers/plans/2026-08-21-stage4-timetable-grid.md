@@ -304,9 +304,9 @@ Apply exactly this mapping. Each target is the token the alias already resolves 
 | `fontWeight: 700` | `font-bold` | direct |
 | `fontSize: 12` | `text-xs` | direct |
 | `color: "var(--text-muted)"` | `text-muted-foreground` | `--text-muted` is defined as `var(--muted-foreground)` |
-| `boxShadow: "var(--shadow-sm)"` | `shadow-sm` | see the note below |
+| ~~`boxShadow: "var(--shadow-sm)"`~~ | — | **not in this task.** Both occurrences are in the block markup, not the chrome. Moved to Task 4, which is already changing the block's shadow. |
 
-**On `--shadow-sm`.** The app defines `--shadow-sm` at `:root`, which collides with Tailwind v4's own theme variable of that name — a carry-over flagged back in stage 2 and never resolved. Switching to Tailwind's `shadow-sm` utility and letting Task 6 delete the custom property ends the collision. The two values are close (`0 1px 3px oklch(0 0 0 / 0.08)` against Tailwind's default) but not identical; confirm against the screenshot and say in the report whether any difference is visible.
+**On `--shadow-sm`.** It is the one alias this task does not clear, because it is not in the chrome — see the struck row above. Task 4 handles it.
 
 - [ ] **Step 1: Re-establish the baseline**
 
@@ -624,11 +624,13 @@ Do **not** make the block a `<button>`. It performs no action; a button that doe
 
 - [ ] **Step 3: Hover affordance on both grids**
 
-The main grid gives no hover feedback; the compare grid sets `cursor: pointer` on something that is not clickable. Settle on one recipe for both — a shadow lift, no cursor change:
+The main grid gives no hover feedback; the compare grid sets `cursor: pointer` on something that is not clickable. Settle on one recipe for both — a shadow lift, no cursor change. **This is also where `--shadow-sm` retires**, the last of the five legacy aliases: the block currently sets `boxShadow: "var(--shadow-sm)"` inline (two occurrences). Replace it with the utility in the same className, so the block's resting and hover shadows are one recipe:
 
 ```tsx
-className="transition-shadow duration-150 hover:shadow-md"
+className="shadow-sm transition-shadow duration-150 hover:shadow-md"
 ```
+
+The app declares `--shadow-sm` at `:root`, colliding with Tailwind v4's own theme variable of that name — a carry-over flagged in stage 2 and never resolved. Moving to the utility here is what lets Task 6 delete the custom property. The two values are close but not identical (`0 1px 3px oklch(0 0 0 / 0.08)` against Tailwind's default); check it against a screenshot and report whether any difference is visible.
 
 Remove `cursor: "pointer"` from `CompareTimetableGrid`'s block style. Nothing there is clickable, and a pointer cursor promises otherwise.
 
