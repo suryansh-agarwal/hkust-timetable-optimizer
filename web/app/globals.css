@@ -74,6 +74,12 @@
   --cmp-a: 0 84% 55%;
   --cmp-b: 217 91% 55%;
 
+  /* Blocks put the subject label on a 16% wash of its own hue. Four light
+     hues fail AA that way (--sub-8 at 3.02:1), so the ink darkens toward
+     black. oklab, not oklch: black has no hue and a polar mix toward it is
+     undefined at the endpoint. Dark mode already passes on all eight. */
+  --sub-ink-mix: 16%;
+
   /* --- Legacy aliases. Deleted per-file as later stages migrate. --- */
   --surface: var(--card);
   --surface-2: var(--muted);
@@ -150,6 +156,8 @@
   --sub-8: 38 92% 62%;
   --cmp-a: 0 90% 70%;
   --cmp-b: 217 91% 70%;
+
+  --sub-ink-mix: 0%;
 
   --pin-text: oklch(0.7800 0.1000 251.48);
   --danger: oklch(0.70 0.17 25.5);

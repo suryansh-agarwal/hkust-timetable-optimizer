@@ -46,7 +46,7 @@ function blockColors(hueVar: string) {
   return {
     bg: `hsl(var(${hueVar}) / 0.16)`,
     border: `hsl(var(${hueVar}) / 0.55)`,
-    text: `hsl(var(${hueVar}))`,
+    ink: `color-mix(in oklab, hsl(var(${hueVar})), black var(--sub-ink-mix))`,
   };
 }
 
@@ -196,7 +196,7 @@ export function TimetableGrid(props: {
     const subjects = Array.from(
       new Set(props.meetings.map((m) => getSubjectFromCode(m.course_code)))
     ).sort((a, b) => a.localeCompare(b));
-    const map = new Map<string, { bg: string; border: string; text: string }>();
+    const map = new Map<string, { bg: string; border: string; ink: string }>();
     subjects.forEach((subject, idx) => {
       map.set(subject, SUBJECT_COLORS[idx % SUBJECT_COLORS.length]);
     });
@@ -232,6 +232,7 @@ export function TimetableGrid(props: {
                 return (
                   <div
                     key={idx}
+                    data-slot="grid-block"
                     title={`${m.course_code} ${m.section}\n${m.day} ${minutesToHHMM(m.start_min)}–${minutesToHHMM(m.end_min)}`}
                     style={{
                       position: "absolute",
@@ -248,9 +249,9 @@ export function TimetableGrid(props: {
                       overflow: "hidden",
                     }}
                   >
-                    <div style={{ fontWeight: 800, fontSize: 12, color: colors.text }}>{m.course_code}</div>
-                    <div style={{ fontSize: 12, color: colors.text, opacity: 0.85 }}>{m.section}</div>
-                    <div style={{ fontSize: 11, color: colors.text, opacity: 0.75, marginTop: 4 }}>
+                    <div className="text-xs font-bold" style={{ color: colors.ink }}>{m.course_code}</div>
+                    <div className="text-xs" style={{ color: colors.ink }}>{m.section}</div>
+                    <div className="mt-1 text-[11px]" style={{ color: colors.ink }}>
                       {minutesToHHMM(m.start_min)}–{minutesToHHMM(m.end_min)}
                     </div>
                   </div>
@@ -343,6 +344,7 @@ export function CompareTimetableGrid(props: {
                 return (
                   <div
                     key={`${m.side}-${idx}`}
+                    data-slot="grid-block"
                     title={`[${m.side}] ${m.course_code} ${m.section}\n${m.day} ${minutesToHHMM(m.start_min)}–${minutesToHHMM(m.end_min)}`}
                     onMouseEnter={() => setHoveredSide(m.side)}
                     onMouseLeave={() => setHoveredSide(null)}
@@ -365,9 +367,9 @@ export function CompareTimetableGrid(props: {
                       zIndex: hoveredSide === m.side ? 10 : 1,
                     }}
                   >
-                    <div style={{ fontWeight: 800, fontSize: 12, color: colors.text }}>{m.course_code}</div>
-                    <div style={{ fontSize: 12, color: colors.text, opacity: 0.8 }}>{m.section}</div>
-                    <div style={{ fontSize: 11, color: colors.text, opacity: 0.7, marginTop: 4 }}>
+                    <div className="text-xs font-bold" style={{ color: colors.ink }}>{m.course_code}</div>
+                    <div className="text-xs" style={{ color: colors.ink }}>{m.section}</div>
+                    <div className="mt-1 text-[11px]" style={{ color: colors.ink }}>
                       {minutesToHHMM(m.start_min)}–{minutesToHHMM(m.end_min)}
                     </div>
                   </div>
