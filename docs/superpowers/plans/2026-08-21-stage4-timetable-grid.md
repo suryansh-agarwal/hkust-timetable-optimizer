@@ -98,7 +98,9 @@ Every task's requirements implicitly include this section.
 
 **Interfaces:**
 - Consumes: nothing from earlier tasks.
-- Produces: `GRID_START_HOUR`, `GRID_END_HOUR`, `HOUR_ROW_HEIGHT`, `useGridGeometry`, `<GridFrame>`, `<GridHeaderRow>`, `<TimeAxis>`, `<DayColumn>`. Tasks 2–6 edit these instead of two copies of the same markup.
+- Produces: `GRID_START_HOUR`, `GRID_END_HOUR`, `HOUR_ROW_HEIGHT`, `useGridGeometry`, `<GridFrame>`, `<GridHeaderRow>`, `<GridBody>`, `<TimeAxis>`, `<DayColumn>`. Tasks 2–6 edit these instead of two copies of the same markup.
+
+**Five pieces, not four.** An earlier draft of this task listed four and still expected `grep -c "repeat(5, 1fr)"` to return 2 — inconsistent, because the `display:grid` body-row wrapper is duplicated too. `GridBody` is that wrapper. It is not exported; nothing outside the file uses it.
 
 `TimetableGrid` (`:85`) and `CompareTimetableGrid` (`:223`) render byte-identical chrome: the same outer bordered box, the same `80px repeat(5, 1fr)` header, the same time axis, the same hour lines. Migrating tokens twice is how the two drift apart, and verbatim duplication of a logic block is a defect the review rubric flags on sight. This task is a pure refactor: **no rendered output may change.**
 
@@ -192,6 +194,14 @@ function TimeAxis({ startHour, endHour, startMin, pxPerMin, gridHeight }: Return
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function GridBody({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: `80px repeat(5, 1fr)` }}>
+      {children}
     </div>
   );
 }
@@ -304,7 +314,7 @@ Same scaffolding as Task 1 Step 1 — background dev server, `preview-tmp` route
 
 - [ ] **Step 2: Apply the mapping to the four chrome pieces**
 
-Work through `GridFrame`, `GridHeaderRow`, `TimeAxis` and `DayColumn`. `TimeAxis` and `DayColumn` keep `position`, `top`, `height`, `left`, `right` in `style` — those are geometry. Do not mix a `style` colour with a `className` colour on the same element.
+Work through `GridFrame`, `GridHeaderRow`, `GridBody`, `TimeAxis` and `DayColumn`. **`GridBody` is easy to miss** — it was added late to Task 1 and carries the second `gridTemplateColumns`. `TimeAxis` and `DayColumn` keep `position`, `top`, `height`, `left`, `right` in `style` — those are geometry. Do not mix a `style` colour with a `className` colour on the same element.
 
 - [ ] **Step 3: Confirm the chrome is clean**
 
@@ -312,7 +322,7 @@ Work through `GridFrame`, `GridHeaderRow`, `TimeAxis` and `DayColumn`. `TimeAxis
 cd web && grep -n 'border-subtle\|border-faint\|surface-2\|shadow-sm\|text-muted' app/components/TimetableGrid.tsx
 ```
 
-Expected: only hits inside the block markup, which Task 3 owns. Zero hits in the four chrome components. If a chrome hit survives, the mapping was applied incompletely.
+Expected: only hits inside the block markup, which Task 3 owns. Zero hits in the five chrome components. If a chrome hit survives, the mapping was applied incompletely.
 
 - [ ] **Step 4: Compare against the baseline**
 
