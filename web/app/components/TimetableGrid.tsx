@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
+import { cn } from "@/lib/utils";
 
 type Meeting = {
   day: string;          // "Mo", "Tu", ...
@@ -95,7 +96,7 @@ function useGridGeometry(startHour = GRID_START_HOUR, endHour = GRID_END_HOUR) {
 
 function GridFrame({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
+    <div className="border border-border rounded-xl overflow-hidden">
       {children}
     </div>
   );
@@ -103,10 +104,10 @@ function GridFrame({ children }: { children: React.ReactNode }) {
 
 function GridHeaderRow() {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: `80px repeat(5, 1fr)`, background: "var(--surface-2)", borderBottom: "1px solid var(--border-subtle)" }}>
-      <div style={{ padding: 10, fontWeight: 700, fontSize: 12, color: "var(--text-muted)" }}>Time</div>
+    <div className="grid grid-cols-[80px_repeat(5,1fr)] bg-muted border-b border-border">
+      <div className="p-2.5 font-bold text-xs text-muted-foreground">Time</div>
       {DAYS.map((d) => (
-        <div key={d.key} style={{ padding: 10, fontWeight: 700 }}>{d.label}</div>
+        <div key={d.key} className="p-2.5 font-bold">{d.label}</div>
       ))}
     </div>
   );
@@ -114,12 +115,12 @@ function GridHeaderRow() {
 
 function TimeAxis({ startHour, endHour, startMin, pxPerMin, gridHeight }: ReturnType<typeof useGridGeometry>) {
   return (
-    <div style={{ position: "relative", height: gridHeight, borderRight: "1px solid var(--border-subtle)" }}>
+    <div className="relative border-r border-border" style={{ height: gridHeight }}>
       {Array.from({ length: endHour - startHour + 1 }).map((_, i) => {
         const hour = startHour + i;
         const y = (hour * 60 - startMin) * pxPerMin;
         return (
-          <div key={hour} style={{ position: "absolute", top: y - 8, left: 10, fontSize: 12, color: "var(--text-muted)" }}>
+          <div key={hour} className="absolute text-xs text-muted-foreground" style={{ top: y - 8, left: 10 }}>
             {hour.toString().padStart(2, "0")}:00
           </div>
         );
@@ -137,9 +138,12 @@ function DayColumn({ dayKey, startHour, endHour, pxPerMin, gridHeight, children 
   children: React.ReactNode;
 }) {
   return (
-    <div style={{ position: "relative", height: gridHeight, borderRight: dayKey !== "Fr" ? "1px solid var(--border-subtle)" : undefined }}>
+    <div
+      className={cn("relative", dayKey !== "Fr" && "border-r border-border")}
+      style={{ height: gridHeight }}
+    >
       {Array.from({ length: endHour - startHour }).map((_, i) => (
-        <div key={i} style={{ position: "absolute", top: i * 60 * pxPerMin, left: 0, right: 0, height: 1, background: "var(--border-faint)" }} />
+        <div key={i} className="absolute bg-border" style={{ top: i * 60 * pxPerMin, left: 0, right: 0, height: 1 }} />
       ))}
       {children}
     </div>
@@ -150,7 +154,7 @@ function DayColumn({ dayKey, startHour, endHour, pxPerMin, gridHeight, children 
 // the same 80px + 5 equal columns template GridHeaderRow uses.
 function GridBody({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: `80px repeat(5, 1fr)` }}>
+    <div className="grid grid-cols-[80px_repeat(5,1fr)]">
       {children}
     </div>
   );
