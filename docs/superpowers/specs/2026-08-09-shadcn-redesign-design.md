@@ -249,3 +249,42 @@ Additional checks specific to this work:
 - Any backend, scraper or optimiser change
 - Charts and analytics
 - Replacing the timetable grid with a third-party scheduler
+
+## Carried into stage 4
+
+Stage 3c's final whole-branch review raised seven Minor findings that were
+deliberately not fixed on that branch. They are recorded here rather than in
+the stage's scratch ledger, which is deleted when the stage merges.
+
+- **The two `min-w-[720px]` literals** (`ResultsList.tsx`, `CompareSection.tsx`)
+  are the timetable's own geometry — an 80px time gutter plus five day columns
+  — duplicated as a magic number with no comment tying them to it. Stage 4
+  rewrites that geometry, and nothing currently points either literal at the
+  change.
+- **`page.tsx`'s `mb-3` and `mt-1`** are flex children of a `p-5` Card, so they
+  render 28px and 20px rather than the 12px and 4px they name. This is the
+  add-trap stage 3c was written to close, and `mb-3` is not a step on the
+  scale at all. Both were outside every task's declared file list.
+- **The mobile first paint flashes both preference panels open, then
+  collapses them.** `useEffect` commits after paint, so the server-rendered
+  `defaultOpen` markup is painted before the key change remounts the subtree
+  closed. `useSyncExternalStore` would remove the `eslint-disable` but not the
+  flash — the server snapshot is still a fixed value. A CSS-driven collapse
+  would.
+- **`PreferencesPanel`'s `max-h-[520px] overflow-y-auto` makes the panel a
+  scroll container on both axes** (CSS computes the visible axis to `auto`
+  when the other is not visible), as does `CoursePicker`'s `max-h-80`. This
+  matters beyond the panels themselves: the page-level
+  `document.scrollWidth === clientWidth` check that stage 3c leaned on is
+  blind to anything overflowing inside them. Nothing overflows today — the
+  widest mobile row measures ~223px — but the check is weaker than it looks,
+  and stage 4 should not trust it alone.
+- **Collapsed panels unmount**, so find-in-page cannot reach hidden
+  preferences on a phone. `hiddenUntilFound` on `CollapsibleContent` is a
+  one-prop fix whenever the collapsible is next touched.
+- **About twenty `size="sm"` select triggers are 28px tall.** Stage 3c raised
+  seven controls to 44px below `lg`; these are the same tap-target question at
+  roughly three times the count, and they are what a phone user actually
+  touches most. Worth deciding before stage 4 rather than after.
+- The scale table in the stage 3c plan still reads `px-6` for the page
+  container; the shipped value is `px-4 py-5 lg:px-6`.

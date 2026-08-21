@@ -263,7 +263,7 @@ export function CoursePicker(props: Readonly<{
 
       {/* Index error details */}
       {indexStatus.error && (
-        <div className="mt-6 rounded-xl bg-[var(--danger-bg)] p-3 text-xs text-[var(--danger)]">
+        <div className="mt-6 rounded-xl border border-[var(--danger-border)] bg-[var(--danger-bg)] p-3 text-sm text-[var(--danger)]">
           <div className="font-semibold">Could not load course index:</div>
           <div className="mt-1">{indexStatus.error}</div>
           <div className="mt-1 text-muted-foreground">
@@ -274,8 +274,8 @@ export function CoursePicker(props: Readonly<{
 
       {/* selected courses, each with an optional professor lock */}
       <div className="mt-6">
-        <div className="text-sm text-muted-foreground">Selected</div>
-        <div className="mt-2 flex flex-wrap gap-2">
+        <div className="mb-2 text-sm text-muted-foreground">Selected</div>
+        <div className="flex flex-wrap gap-2">
           {selected.length === 0 && (
             <div className="flex w-full items-center justify-center p-6 text-sm text-muted-foreground">
               No courses selected.
@@ -291,6 +291,7 @@ export function CoursePicker(props: Readonly<{
                   <Button
                     variant="ghost"
                     size="icon"
+                    className="min-h-11 min-w-11 lg:min-h-0 lg:min-w-0"
                     onClick={() => remove(code)}
                     aria-label={`Remove ${code}`}
                     title="Remove"
@@ -496,12 +497,12 @@ export function CoursePicker(props: Readonly<{
         {/* list */}
         <div className="mt-2 max-h-80 overflow-auto rounded-xl border border-border bg-card">
           {!indexReady && !indexStatus.error && !indexLoading && (
-            <div className="p-3 text-sm text-muted-foreground">
+            <div className="flex items-center justify-center p-6 text-sm text-muted-foreground">
               Index not loaded yet.
             </div>
           )}
           {indexLoading && (
-            <div className="p-3 text-sm text-muted-foreground">Loading course index...</div>
+            <div className="flex items-center justify-center p-6 text-sm text-muted-foreground">Loading course index...</div>
           )}
           {indexReady && q.trim() === "" && (
             <div className="flex items-center justify-center p-6 text-sm text-muted-foreground">
@@ -549,7 +550,7 @@ export function CoursePicker(props: Readonly<{
                 size="sm"
                 onClick={() => (on ? remove(c.course_code) : add(c.course_code))}
                 disabled={on}
-                className="shrink-0"
+                className="min-h-11 shrink-0 lg:min-h-0"
               >
                 {on ? "Added" : "+ Add"}
               </Button>

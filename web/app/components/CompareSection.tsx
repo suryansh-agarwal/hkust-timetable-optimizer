@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -41,9 +41,9 @@ export function CompareSection({
   const meetingsB = useMemo(() => (pinnedB ? flattenSchedule(pinnedB.schedule) : []), [pinnedB]);
 
   return (
-    <Card>
+    <Card className="py-5">
       <CardHeader>
-        <CardTitle className="text-lg font-semibold">Compare Timetables</CardTitle>
+        <h2 className="text-lg font-semibold">Compare Timetables</h2>
         <CardDescription>
           Pin options above, then select two to overlay and compare
         </CardDescription>
@@ -63,12 +63,13 @@ export function CompareSection({
                   value={p.name}
                   onChange={(e) => onRename(p.id, e.target.value)}
                   aria-label={`Rename ${p.name}`}
-                  className="h-auto w-36 border-0 bg-transparent p-0 text-sm font-semibold shadow-none focus-visible:ring-0"
+                  className="h-auto w-full border-0 bg-transparent p-0 text-sm font-semibold shadow-none focus-visible:ring-0 lg:w-36"
                 />
                 <span className="text-xs text-muted-foreground">{p.score.toFixed(1)}</span>
                 <Button
                   variant="ghost"
                   size="icon"
+                  className="min-h-11 min-w-11 lg:min-h-0 lg:min-w-0"
                   onClick={() => onUnpin(p.id)}
                   title="Unpin"
                   aria-label="Unpin"
@@ -100,7 +101,7 @@ export function CompareSection({
                   ...pinned.map((p) => ({ value: p.id, label: p.name })),
                 ]}
               >
-                <SelectTrigger id="compare-a" size="sm" className="w-48"><SelectValue /></SelectTrigger>
+                <SelectTrigger id="compare-a" size="sm" className="w-full lg:w-48"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value={NO_SELECTION}>(select)</SelectItem>
                   {pinned.map((p) => (
@@ -126,7 +127,7 @@ export function CompareSection({
                   ...pinned.map((p) => ({ value: p.id, label: p.name })),
                 ]}
               >
-                <SelectTrigger id="compare-b" size="sm" className="w-48"><SelectValue /></SelectTrigger>
+                <SelectTrigger id="compare-b" size="sm" className="w-full lg:w-48"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value={NO_SELECTION}>(select)</SelectItem>
                   {pinned.map((p) => (
@@ -144,12 +145,16 @@ export function CompareSection({
             <div className="mb-2 text-sm text-muted-foreground">
               Hover over a class to temporarily hide the other timetable
             </div>
-            <CompareTimetableGrid
-              meetingsA={meetingsA}
-              meetingsB={meetingsB}
-              startHour={8}
-              endHour={20}
-            />
+            <div className="overflow-x-auto">
+              <div className="min-w-[720px]">
+                <CompareTimetableGrid
+                  meetingsA={meetingsA}
+                  meetingsB={meetingsB}
+                  startHour={8}
+                  endHour={20}
+                />
+              </div>
+            </div>
           </div>
         )}
 

@@ -50,13 +50,10 @@
   --ring: oklch(0.3233 0.1025 253.89);
 
   --success: oklch(0.5500 0.1400 150.00);
-  --warn-bg: oklch(0.9500 0.0700 90.00);
-  --warn-text: oklch(0.4500 0.1000 70.00);
 
   --overlay: oklch(0 0 0 / 0.35);
   --shadow-sm: 0 1px 3px oklch(0 0 0 / 0.08);
   --shadow-md: 0 2px 10px oklch(0 0 0 / 0.08);
-  --shadow-lg: 0 12px 30px oklch(0 0 0 / 0.20);
 
   --login-canvas: linear-gradient(135deg, oklch(0.9800 0.0040 250) 0%, oklch(0.9550 0.0090 255) 100%);
   --login-badge: oklch(0.2079 0.0399 265.73);
@@ -82,11 +79,7 @@
   --surface-2: var(--muted);
   --border-subtle: var(--border);
   --border-faint: var(--border);
-  --text-strong: var(--foreground);
-  --text-body: var(--foreground);
   --text-muted: var(--muted-foreground);
-  --text-subtle: var(--muted-foreground);
-  --text-faint: var(--muted-foreground);
   /* Not aliased to --destructive: that is shadcn's fill red for button
      backgrounds, and as text it measures 3.76:1 on white. This app uses
      --danger for text. */
@@ -139,13 +132,10 @@
   --ring: oklch(0.8688 0.0198 252.85);
 
   --success: oklch(0.7200 0.1600 150.00);
-  --warn-bg: oklch(0.3000 0.0600 80.00);
-  --warn-text: oklch(0.8500 0.1400 85.00);
 
   --overlay: oklch(0 0 0 / 0.60);
   --shadow-sm: 0 1px 3px oklch(0 0 0 / 0.50);
   --shadow-md: 0 2px 12px oklch(0 0 0 / 0.55);
-  --shadow-lg: 0 12px 30px oklch(0 0 0 / 0.60);
 
   --login-canvas: linear-gradient(135deg, oklch(0.1371 0.0360 258.53) 0%, oklch(0.2000 0.0350 259) 100%);
   --login-badge: oklch(0.2800 0.0369 259.97);

@@ -34,12 +34,10 @@ export function ResultsList({
 
   return (
     <>
-      <div className="flex items-center justify-between gap-2">
-        <div>
-          <h2 className="text-lg font-semibold">Results</h2>
-          <div className="mt-1 text-sm text-muted-foreground">
-            considered {considered}, returned {returned}
-          </div>
+      <div>
+        <h2 className="text-lg font-semibold">Results</h2>
+        <div className="mt-1 text-sm text-muted-foreground">
+          considered {considered}, returned {returned}
         </div>
       </div>
 
@@ -87,7 +85,11 @@ export function ResultsList({
 
       {/* simple per-day list view (Stage 6 can be a real grid) */}
       <div className="mt-6">
-        <TimetableGrid meetings={meetings} startHour={8} endHour={20} />
+        <div className="overflow-x-auto">
+          <div className="min-w-[720px]">
+            <TimetableGrid meetings={meetings} startHour={8} endHour={20} />
+          </div>
+        </div>
       </div>
     </>
   );
