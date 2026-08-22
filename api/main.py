@@ -37,6 +37,7 @@ from catalog_state import load_state
 
 from mini_catalog import load_mini_catalog, normalize_code
 from section_utils import section_type, group_key
+from infeasibility import blocking_hard_rules, mutually_exclusive_pairs
 
 app = FastAPI()
 
@@ -277,6 +278,32 @@ def optimize_ranked(req: OptimizeRankedRequest):
 
     # Find a pool of feasible schedules. We'll cap by search_limit by requesting more solutions.
     pool = find_bundle_schedules(choices, max_solutions=max(req.search_limit, req.max_solutions))
+
+    # An empty pool means the surviving options cannot be combined. Say which
+    # two courses collide rather than returning an empty list the frontend can
+    # only describe in generalities. blocked_by_lock has already returned if
+    # any single course was emptied, so this is genuinely cross-course.
+    if not pool:
+        pairs = mutually_exclusive_pairs(choices)
+        if pairs:
+            details = "; ".join(
+                f"{a} and {b} cannot both be scheduled - every remaining option clashes"
+                for a, b in pairs
+            )
+            error = f"No timetable is possible: {details}."
+        else:
+            error = (
+                "No timetable is possible: your courses cannot all be scheduled "
+                "together, though no single pair is the cause. Removing one "
+                "course, or relaxing a lock, will show what fits."
+            )
+        return {
+            "ok": False,
+            "error": error,
+            "infeasible_because": "clash",
+            "subjects_fetched": subjects_fetched,
+            "cache_misses": cache_misses,
+        }
 
     # Deduplicate schedules by sorted class_nos
     seen = set()
