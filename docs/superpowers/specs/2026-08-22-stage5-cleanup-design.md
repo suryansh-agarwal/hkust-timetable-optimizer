@@ -178,3 +178,64 @@ Specific to this stage, and measured rather than asserted:
 - **Item 3 changes first-paint behaviour**, which is the hardest thing in this
   stage to verify and the easiest to believe is fixed. The verification above is
   a requirement, not a nicety.
+
+## Carried beyond stage 5
+
+The stage closed what it set out to. These are what its reviews raised and
+deliberately did not fix, recorded here because the scratch ledger is deleted
+at merge.
+
+**The extraction stopped one layer short.** `GridBlock` now holds the block
+body, but `top`, `height`, `lanes`, `laneWidthPct` and `leftPct` are still
+computed with five identical lines in both `placed.map` closures. A lane-packing
+or block-height change is therefore *still* a two-place edit — the exact failure
+mode this stage set out to close. Folding them into a
+`layoutBlock(m, laneCount, startMin, pxPerMin)` returning
+`{ top, height, leftPct, laneWidthPct }` would also collapse four of
+`GridBlock`'s ten props into one. Do this before the next change to grid
+geometry, not after.
+
+**`PreferencesPanel`'s mount effect is at its ceiling.** Two `useState`, one
+`eslint-disable`, an ordering comment, a `key`-forced remount and two ternaries
+is a lot for "collapse on mobile". Neither piece of state is removable as
+designed — `openByDefault` alone cannot distinguish "before the effect" from
+"after the effect on desktop", since both are `true`. The reducible part is the
+`key={`hard-${openByDefault}`}` remount, which exists only because `defaultOpen`
+is read once. A controlled `open` prop fed by a `useSyncExternalStore`
+media-query hook would delete the remount, the `eslint-disable` **and** the
+ordering comment in one move, leaving only the pre-hydration hiding. **The next
+addition to this effect should trigger that refactor rather than a third flag.**
+
+**The `eslint-disable` rests on a lint-rule implementation detail.**
+`react-hooks/set-state-in-effect` reports once per effect, on whichever
+`setState` it reaches first, so the single directive covers both calls only
+because `setOpenByDefault` is listed first. This is documented in the file. It
+will break on a `react-hooks` bump — as a lint error, not a runtime one, which
+is why it is acceptable.
+
+**A brief aria/visual disagreement on mobile.** Between first paint and the
+passive effect, the trigger reports the panel expanded and the chevron points
+open while `max-lg:hidden` renders the content `display: none`. The window is
+one effect tick and the state resolves consistently — a tap inside it closes a
+panel that then remounts closed, no stuck state. Inherent to the
+paint-suppression approach.
+
+**The impossible-timetable toast does not name instructor pins.**
+`"Timetable not possible with current subjects/sections"` covers two of three
+causes. `instructorLocks` is a separate live mechanism, and a pin that is
+individually satisfiable but jointly infeasible lands on this same path without
+being named — so a student who locked a professor is told to change subjects or
+sections. "subjects or pins" would cover all three. The current wording is the
+project owner's deliberate choice; changing it is theirs to make.
+
+**If a tight caption was the intent for `page.tsx`'s "Selected:" line**, the
+real fix is nesting it in a shared wrapper with `CoursePicker` rather than a
+margin — that is how this codebase's other captions insulate themselves from a
+Card's flex gap. Removing the margin was correct under the existing convention;
+this is only relevant if the visual intent was different.
+
+**Two verification gaps, both low-risk.** The compare grid's `onFocus`/`onBlur`
+through `GridBlock`'s `interaction` prop were confirmed by code inspection, not
+a runtime keyboard pass. And the toast string was confirmed by source only —
+`/optimize/ranked` needs a mini catalog and `api/data`'s catalogs are 0 bytes,
+so no optimise reaches the toast path in a local checkout.
