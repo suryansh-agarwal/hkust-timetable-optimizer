@@ -356,7 +356,7 @@ export function CompareTimetableGrid(props: {
                     tabIndex={0}
                     aria-label={label}
                     title={label}
-                    className="shadow-sm transition-shadow duration-150 hover:shadow-md"
+                    className="shadow-sm transition-[opacity,box-shadow] duration-150 ease-in-out hover:shadow-md"
                     onMouseEnter={() => setHoveredSide(m.side)}
                     onMouseLeave={() => setHoveredSide(null)}
                     onFocus={() => setHoveredSide(m.side)}
@@ -374,7 +374,6 @@ export function CompareTimetableGrid(props: {
                       background: colors.bg,
                       overflow: "hidden",
                       opacity,
-                      transition: "opacity 0.15s ease-in-out, box-shadow 0.15s ease-in-out",
                       zIndex: hoveredSide === m.side ? 10 : 1,
                     }}
                   >
