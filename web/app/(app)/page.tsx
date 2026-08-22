@@ -282,6 +282,11 @@ export default function Home() {
 
       setResult(data);
       const resultCount = data?.results?.length ?? 0;
+      // The backend now returns ok:false with a specific reason whenever it
+      // has nothing to show - a clash it can name, or a hard rule that
+      // rejected every schedule - and that renders in the persistent panel
+      // above. This branch is the fallback for a path that returns an empty
+      // list without one, which should not happen.
       if (resultCount === 0) {
         toast.error("Timetable not possible with current subjects/sections");
       } else {

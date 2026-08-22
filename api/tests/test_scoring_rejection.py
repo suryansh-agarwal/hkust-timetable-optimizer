@@ -70,16 +70,19 @@ def test_score_schedule_marks_a_hard_cutoff_violation_as_rejected():
 
 def test_an_impossible_hard_no_after_returns_no_results(client):
     # The only lecture ends at 11:50, so a 09:00 cutoff cannot be met.
+    # /optimize/ranked now diagnoses this rather than returning an empty
+    # ok:True list - see test_infeasibility_endpoint.py for the message.
     data = post(client, {"hard_no_after": {"Mo": "09:00"}})
-    assert data["ok"] is True
-    assert data["results"] == []
-    assert data["returned"] == 0
+    assert data["ok"] is False
+    assert data["infeasible_because"] == "hard_preferences"
+    assert "results" not in data
 
 
 def test_an_impossible_hard_no_before_returns_no_results(client):
     # The only lecture starts at 10:30, so a 14:00 no-before cannot be met.
     data = post(client, {"hard_no_before": {"Mo": "14:00"}})
-    assert data["results"] == []
+    assert data["ok"] is False
+    assert data["infeasible_because"] == "hard_preferences"
 
 
 def test_a_satisfiable_hard_cutoff_still_returns_the_schedule(client):

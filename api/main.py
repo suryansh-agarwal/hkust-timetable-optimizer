@@ -37,6 +37,7 @@ from catalog_state import load_state
 
 from mini_catalog import load_mini_catalog, normalize_code
 from section_utils import section_type, group_key
+from infeasibility import blocking_hard_rules, mutually_exclusive_pairs
 
 app = FastAPI()
 
@@ -178,8 +179,8 @@ class Preferences(BaseModel):
 class OptimizeRankedRequest(BaseModel):
     term: str
     course_codes: List[str]
-    max_solutions: int = 10          # return top K
-    search_limit: int = 5000         # how many feasible schedules to search/score internally
+    max_solutions: int = Field(10, ge=1)          # return top K
+    search_limit: int = Field(5000, ge=1)         # how many feasible schedules to search/score internally
     refresh: bool = False
     use_cache: bool = True
     # Course code -> professor. Absent key means the course is unconstrained.
@@ -213,6 +214,18 @@ def _describe_lock(instructor_lock: Optional[str], section_lock: Optional[Dict[s
     return " and ".join(parts) if parts else "the selected constraints"
 
 
+def _describe_hard_rule(rule: Dict[str, Optional[str]]) -> str:
+    """One hard rule in the words a student set it in."""
+    kind, day, cutoff = rule["type"], rule.get("day"), rule.get("cutoff")
+    if kind == "hard_free_day_violation":
+        return f"{day} must be free"
+    if kind == "hard_no_after_violation":
+        return f"no classes after {cutoff} on {day}"
+    if kind == "hard_no_before_violation":
+        return f"no classes before {cutoff} on {day}"
+    return kind
+
+
 @app.post("/optimize/ranked")
 def optimize_ranked(req: OptimizeRankedRequest):
     if not req.course_codes:
@@ -228,6 +241,7 @@ def optimize_ranked(req: OptimizeRankedRequest):
             "ok": False,
             "error": "Course codes not found",
             "missing": missing,
+            "infeasible_because": "missing",
             "subjects_fetched": subjects_fetched,
             "cache_misses": cache_misses,
         }
@@ -271,12 +285,51 @@ def optimize_ranked(req: OptimizeRankedRequest):
             "ok": False,
             "error": f"No schedule is possible: {details}.",
             "blocked_by_lock": blocked_by_lock,
+            "infeasible_because": "lock",
             "subjects_fetched": subjects_fetched,
             "cache_misses": cache_misses,
         }
 
     # Find a pool of feasible schedules. We'll cap by search_limit by requesting more solutions.
-    pool = find_bundle_schedules(choices, max_solutions=max(req.search_limit, req.max_solutions))
+    # `cap` is captured because it is a cap, not a target: when the search
+    # stops at it, `pool` is a sample of the solution space rather than the
+    # whole thing, and callers downstream need to know which happened.
+    cap = max(req.search_limit, req.max_solutions)
+    pool = find_bundle_schedules(choices, max_solutions=cap)
+
+    # An empty pool means the surviving options cannot be combined. Say which
+    # two courses collide rather than returning an empty list the frontend can
+    # only describe in generalities. blocked_by_lock has already returned if
+    # any single course was emptied, so this is genuinely cross-course.
+    #
+    # This branch is NOT exposed to the truncation problem the hard-rule
+    # branch below has to hedge against: `not pool` with a positive cap means
+    # the search returned zero solutions while still under the cap, so it
+    # genuinely exhausted the space rather than stopping early. Only a
+    # non-empty capped pool can be an unrepresentative sample.
+    if not pool:
+        pairs = mutually_exclusive_pairs(choices)
+        if pairs:
+            details = "; ".join(
+                f"{a} and {b} cannot both be scheduled - every remaining option clashes"
+                for a, b in pairs
+            )
+            error = f"No timetable is possible: {details}."
+            cause = "clash"
+        else:
+            error = (
+                "No timetable is possible: your courses cannot all be scheduled "
+                "together, though no single pair is the cause. Removing one "
+                "course, or relaxing a lock, will show what fits."
+            )
+            cause = "unknown"
+        return {
+            "ok": False,
+            "error": error,
+            "infeasible_because": cause,
+            "subjects_fetched": subjects_fetched,
+            "cache_misses": cache_misses,
+        }
 
     # Deduplicate schedules by sorted class_nos
     seen = set()
@@ -288,6 +341,7 @@ def optimize_ranked(req: OptimizeRankedRequest):
             unique_pool.append(sch)
 
     scored = []
+    rejected_breakdowns = []
     for sch in unique_pool:
         s, why = score_schedule(sch, req.prefs)
         # Filter on the explicit flag, not on the score. This compared against
@@ -297,6 +351,50 @@ def optimize_ranked(req: OptimizeRankedRequest):
         # timetable exists.
         if not why.get("rejected"):
             scored.append((s, why, sch))
+        else:
+            # Kept only to explain a total rejection below; discarded otherwise.
+            rejected_breakdowns.append(why)
+
+    # Schedules exist and every one breaks a hard rule. The course selection is
+    # not the problem, which is the single most useful thing to tell a student
+    # here - the old message said the opposite.
+    #
+    # `blocking_hard_rules` can return empty for a non-empty rejected_breakdowns
+    # if a writer in scoring.py ever set rejected=True without appending a
+    # hard_* penalty - not possible today, but that invariant lives in a
+    # different file with nothing binding the two. Guarding on the walrus here
+    # means an empty `rules` falls through to the existing success path
+    # (an empty results list) instead of emitting "...breaks at least one of: .".
+    if not scored and rejected_breakdowns and (rules := blocking_hard_rules(rejected_breakdowns)):
+        described = "; ".join(_describe_hard_rule(r) for r in rules)
+        count = len(rejected_breakdowns)
+        noun, verb = ("timetable", "fits") if count == 1 else ("timetables", "fit")
+        joiner = "breaks" if len(rules) == 1 else "breaks at least one of"
+        tail = (
+            "Relax that rule, or make it a soft preference, to see them."
+            if len(rules) == 1 else
+            "Relax one of those rules, or make it a soft preference, to see them."
+        )
+        # `pool` is capped (see `cap` above), so when the search stopped at the
+        # cap it is a sample of the solution space, not the whole thing - a
+        # schedule satisfying the rule can sit past the cap. Truncation is
+        # read off len(pool) vs cap, not off `count`: rejected_breakdowns is
+        # deduped into unique_pool first, so count can be smaller than pool
+        # without the search having exhausted the space.
+        if len(pool) >= cap:
+            error = (
+                f"Every one of the first {count} timetables we checked {joiner}: {described}. "
+                f"There may be others past our search limit. {tail}"
+            )
+        else:
+            error = f"{count} {noun} {verb} your courses, but every one {joiner}: {described}. {tail}"
+        return {
+            "ok": False,
+            "error": error,
+            "infeasible_because": "hard_preferences",
+            "subjects_fetched": subjects_fetched,
+            "cache_misses": cache_misses,
+        }
 
     scored.sort(key=lambda x: x[0], reverse=True)
     top = scored[: req.max_solutions]

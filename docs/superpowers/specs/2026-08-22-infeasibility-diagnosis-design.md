@@ -164,3 +164,50 @@ Worth a cap and a "gave up" state if it ever bites.
   byte-identical in its response shape.
 - Web suite stays at 59 and `next build` stays clean; the only frontend change
   is a comment.
+
+## Carried beyond this feature
+
+What the reviews raised and the work deliberately did not fix. Recorded here
+because the scratch ledger is deleted at merge.
+
+**The correction this spec most needed.** An earlier draft called the search cap
+"a known adjacent risk, not addressed here" and said the feature "does not make
+it worse". That was wrong, and the final review caught it. `pool` is capped, so
+a truncated pool is a *sample*, and the hard-rule branch asserted "every one
+breaks X" about it as though it were the whole solution set — turning a message
+that was vague but true into one that was specific and false. The shipped code
+hedges when `len(pool) >= cap`. The lesson generalises: **a more precise message
+is only an improvement if the precision is earned.**
+
+**A sectionless course still gets the vague message.** If a course has zero live
+sections for a reason other than a lock, `blocked_by_lock` does not fire (it
+requires `normalise(lock) or has_pin(pins)`) and `mutually_exclusive_pairs`
+skips empty-bundle courses, so the higher-order fallback message runs instead of
+naming the empty course. The advice it gives — remove a course — is correct, just
+not specific. Widening `blocked_by_lock`'s trigger to any empty bundle list,
+with a message that does not blame a lock when none is set, would close it.
+
+**The truncated message does not pluralise.** It hardcodes "timetables" where
+the non-truncated one computes `noun`/`verb` from the count, so a truncated pool
+of one reads "the first 1 timetables". Unreachable from the shipped client,
+which hardcodes `search_limit: 2000` — only a hand-built request or a test
+produces it. One line, reusing the existing `noun`.
+
+**Minimal unsatisfiable subsets.** Three courses that pair up fine but cannot all
+coexist get an honest "no single pair is the cause" rather than a named set.
+`infeasible_because: "unknown"` marks exactly that case, so a future MUS
+implementation has a hook.
+
+**Wording.** The multi-rule list joins with `"; "` — "Mo must be free; no classes
+after 10:00 on Tu". Correct and unambiguous; an "or"-joined list would read
+closer to speech, at the cost of ambiguity when a rule itself contains "or".
+
+**`HARD_PREFIX`** in `infeasibility.py` has no leading underscore and there is no
+`__all__`, so it is importable although the module's interface is the two
+functions.
+
+**The exhaustive search itself.** A *successful* search exits as soon as it has
+enough solutions; a *failing* one explores until the cap. This feature diagnoses
+after that completes and does not change its cost. A node budget and an explicit
+"gave up" state would be the real fix, and would also let the truncation hedge
+above become a precise statement rather than a hedge.
