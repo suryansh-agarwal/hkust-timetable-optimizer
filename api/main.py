@@ -348,15 +348,15 @@ def optimize_ranked(req: OptimizeRankedRequest):
         rules = blocking_hard_rules(rejected_breakdowns)
         described = "; ".join(_describe_hard_rule(r) for r in rules)
         count = len(rejected_breakdowns)
-        noun = "timetable" if count == 1 else "timetables"
+        noun, verb = ("timetable", "fits") if count == 1 else ("timetables", "fit")
         joiner = "breaks" if len(rules) == 1 else "breaks at least one of"
         return {
             "ok": False,
             "error": (
-                f"{count} {noun} fit your courses, but every one {joiner}: {described}. "
+                f"{count} {noun} {verb} your courses, but every one {joiner}: {described}. "
                 "Relax that rule, or make it a soft preference, to see them."
                 if len(rules) == 1 else
-                f"{count} {noun} fit your courses, but every one {joiner}: {described}. "
+                f"{count} {noun} {verb} your courses, but every one {joiner}: {described}. "
                 "Relax one of those rules, or make it a soft preference, to see them."
             ),
             "infeasible_because": "hard_preferences",

@@ -104,7 +104,9 @@ def test_a_hard_rule_that_rejects_everything_is_named(monkeypatch):
 
     assert data["ok"] is False
     assert data["infeasible_because"] == "hard_preferences"
-    assert "1 timetable" in data["error"]
+    # Pinned to the verb agreeing with the count: "1 timetable fits", not the
+    # pluralised-noun-only "1 timetable fit" the message used to produce.
+    assert "1 timetable fits your courses" in data["error"]
     assert "15:00" in data["error"] and "Mo" in data["error"]
 
 
@@ -128,3 +130,37 @@ def test_a_hard_rule_that_rejects_only_some_schedules_is_not_named(monkeypatch):
     assert data["ok"] is True
     assert len(data["results"]) == 1
     assert "infeasible_because" not in data
+
+
+def test_two_different_rules_are_both_named(monkeypatch):
+    # One course, two sections. L1 meets Monday, which a hard free day on Mo
+    # rejects outright. L2 meets Tuesday 10:30-11:50, which a hard no-after
+    # cutoff of 10:00 on Tu rejects. No single schedule trips both rules -
+    # each rejected breakdown carries exactly one, since score_schedule
+    # returns on the first violation it finds - so this is only detectable
+    # because blocking_hard_rules unions across breakdowns instead of
+    # intersecting. If it intersected, the two per-schedule rule sets
+    # ({hard_free_day_violation} and {hard_no_after_violation}) share nothing,
+    # the result would be empty, and this test would fail.
+    courses = {
+        "COMP 2011": Course(
+            course_code="COMP 2011", title="Programming with C++", units=4,
+            sections=[
+                lecture("L1", 1001, "Mo", 0, 540, 620),
+                lecture("L2", 1002, "Tu", 1, 630, 710),
+            ],
+        ),
+    }
+    client = client_for(monkeypatch, courses)
+
+    data = post(
+        client,
+        course_codes=["COMP 2011"],
+        prefs={"hard_free_days": ["Mo"], "hard_no_after": {"Tu": "10:00"}},
+    )
+
+    assert data["ok"] is False
+    assert data["infeasible_because"] == "hard_preferences"
+    assert "at least one of" in data["error"]
+    assert "Mo must be free" in data["error"]
+    assert "no classes after 10:00 on Tu" in data["error"]
