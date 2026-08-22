@@ -202,8 +202,13 @@ type GridBlockProps = {
   laneWidthPct: number;
   /** The two grids animate different properties: only the compare grid fades. */
   transitionClass: string;
-  /** Compare grid only - dims the side that is not hovered or focused. */
-  overlay?: { opacity: number; zIndex: number };
+  /**
+   * Spread last into `style` below, so anything set here supersedes this
+   * component's own classes - in particular its `zIndex` supersedes
+   * `focus-visible:z-10`, which is why the compare grid's focus lift comes
+   * from `hoveredSide` rather than from that class.
+   */
+  styleOverride?: { opacity: number; zIndex: number };
   /** Compare grid only - drives that dimming from pointer and keyboard alike. */
   interaction?: Pick<
     React.HTMLAttributes<HTMLDivElement>,
@@ -213,7 +218,7 @@ type GridBlockProps = {
 
 function GridBlock({
   meeting: m, colors, label, top, height, leftPct, laneWidthPct,
-  transitionClass, overlay, interaction,
+  transitionClass, styleOverride, interaction,
 }: GridBlockProps) {
   const detail = blockDetail(height);
   return (
@@ -240,7 +245,7 @@ function GridBlock({
         fontSize: 12,
         background: colors.bg,
         overflow: "hidden",
-        ...overlay,
+        ...styleOverride,
       }}
     >
       <div className="text-xs font-bold leading-tight" style={{ color: colors.ink }}>{m.course_code}</div>
@@ -348,7 +353,7 @@ export function TimetableGrid(props: {
   );
 }
 
-// ---- Compare Timetable Grid with overlay and hover-to-fade ----
+// ---- Compare Timetable Grid with hover-to-fade dimming ----
 export function CompareTimetableGrid(props: {
   meetingsA: Meeting[];
   meetingsB: Meeting[];
@@ -436,7 +441,7 @@ export function CompareTimetableGrid(props: {
                     leftPct={leftPct}
                     laneWidthPct={laneWidthPct}
                     transitionClass="transition-[opacity,box-shadow] duration-150 ease-in-out"
-                    overlay={{ opacity, zIndex: hoveredSide === m.side ? 10 : 1 }}
+                    styleOverride={{ opacity, zIndex: hoveredSide === m.side ? 10 : 1 }}
                     interaction={{
                       onMouseEnter: () => setHoveredSide(m.side),
                       onMouseLeave: () => setHoveredSide(null),
