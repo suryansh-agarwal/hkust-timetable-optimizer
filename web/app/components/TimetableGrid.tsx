@@ -162,6 +162,17 @@ function GridBody({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * Blocks are sized by duration, so a 30-minute class gets 32px and cannot
+ * show three lines. Drop detail as height shrinks rather than shrinking the
+ * type - the full string is on the block's aria-label and title regardless.
+ */
+function blockDetail(height: number): "full" | "code-and-section" | "code-only" {
+  if (height >= 56) return "full";
+  if (height >= 36) return "code-and-section";
+  return "code-only";
+}
+
 export function TimetableGrid(props: {
   meetings: Meeting[];
   startHour?: number; // default 8
@@ -232,6 +243,7 @@ export function TimetableGrid(props: {
                 const colors = subjectColors.get(subject) ?? SUBJECT_COLORS[0];
 
                 const label = `${m.course_code} ${m.section}, ${DAY_LABELS[m.day] ?? m.day} ${minutesToHHMM(m.start_min)} to ${minutesToHHMM(m.end_min)}`;
+                const detail = blockDetail(height);
 
                 return (
                   <div
@@ -240,7 +252,7 @@ export function TimetableGrid(props: {
                     tabIndex={0}
                     aria-label={label}
                     title={label}
-                    className="shadow-sm transition-shadow duration-150 hover:shadow-md"
+                    className="shadow-sm transition-shadow duration-150 hover:shadow-md p-1.5"
                     style={{
                       position: "absolute",
                       top,
@@ -249,17 +261,20 @@ export function TimetableGrid(props: {
                       width: `calc(${laneWidthPct}% - ${gap}px)`,
                       borderRadius: 10,
                       border: `2px solid ${colors.border}`,
-                      padding: 8,
                       fontSize: 12,
                       background: colors.bg,
                       overflow: "hidden",
                     }}
                   >
-                    <div className="text-xs font-bold" style={{ color: colors.ink }}>{m.course_code}</div>
-                    <div className="text-xs" style={{ color: colors.ink }}>{m.section}</div>
-                    <div className="mt-1 text-[11px]" style={{ color: colors.ink }}>
-                      {minutesToHHMM(m.start_min)}–{minutesToHHMM(m.end_min)}
-                    </div>
+                    <div className="text-xs font-bold leading-tight" style={{ color: colors.ink }}>{m.course_code}</div>
+                    {detail !== "code-only" && (
+                      <div className="text-xs leading-tight" style={{ color: colors.ink }}>{m.section}</div>
+                    )}
+                    {detail === "full" && (
+                      <div className="mt-1 text-[11px] leading-tight" style={{ color: colors.ink }}>
+                        {minutesToHHMM(m.start_min)}–{minutesToHHMM(m.end_min)}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -348,6 +363,7 @@ export function CompareTimetableGrid(props: {
                 const opacity = isDimmedByHover ? 0.25 : 1;
 
                 const label = `Option ${m.side}, ${m.course_code} ${m.section}, ${DAY_LABELS[m.day] ?? m.day} ${minutesToHHMM(m.start_min)} to ${minutesToHHMM(m.end_min)}`;
+                const detail = blockDetail(height);
 
                 return (
                   <div
@@ -356,7 +372,7 @@ export function CompareTimetableGrid(props: {
                     tabIndex={0}
                     aria-label={label}
                     title={label}
-                    className="shadow-sm transition-[opacity,box-shadow] duration-150 ease-in-out hover:shadow-md"
+                    className="shadow-sm transition-[opacity,box-shadow] duration-150 ease-in-out hover:shadow-md p-1.5"
                     onMouseEnter={() => setHoveredSide(m.side)}
                     onMouseLeave={() => setHoveredSide(null)}
                     onFocus={() => setHoveredSide(m.side)}
@@ -369,7 +385,6 @@ export function CompareTimetableGrid(props: {
                       width: `calc(${laneWidthPct}% - ${gap}px)`,
                       borderRadius: 10,
                       border: `2px solid ${colors.border}`,
-                      padding: 8,
                       fontSize: 12,
                       background: colors.bg,
                       overflow: "hidden",
@@ -377,11 +392,15 @@ export function CompareTimetableGrid(props: {
                       zIndex: hoveredSide === m.side ? 10 : 1,
                     }}
                   >
-                    <div className="text-xs font-bold" style={{ color: colors.ink }}>{m.course_code}</div>
-                    <div className="text-xs" style={{ color: colors.ink }}>{m.section}</div>
-                    <div className="mt-1 text-[11px]" style={{ color: colors.ink }}>
-                      {minutesToHHMM(m.start_min)}–{minutesToHHMM(m.end_min)}
-                    </div>
+                    <div className="text-xs font-bold leading-tight" style={{ color: colors.ink }}>{m.course_code}</div>
+                    {detail !== "code-only" && (
+                      <div className="text-xs leading-tight" style={{ color: colors.ink }}>{m.section}</div>
+                    )}
+                    {detail === "full" && (
+                      <div className="mt-1 text-[11px] leading-tight" style={{ color: colors.ink }}>
+                        {minutesToHHMM(m.start_min)}–{minutesToHHMM(m.end_min)}
+                      </div>
+                    )}
                   </div>
                 );
               })}
