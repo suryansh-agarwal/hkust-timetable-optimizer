@@ -8,7 +8,7 @@ import { Card, CardAction, CardContent, CardDescription, CardHeader } from "@/co
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CompareTimetableGrid } from "./TimetableGrid";
+import { CompareTimetableGrid, GRID_MIN_WIDTH_PX } from "./TimetableGrid";
 import { flattenSchedule, type Pinned } from "@/lib/schedule";
 
 // Base UI treats value="" as "nothing selected" (SelectRoot.js:185), so the
@@ -146,7 +146,7 @@ export function CompareSection({
               Hover over a class to temporarily hide the other timetable
             </div>
             <div className="overflow-x-auto">
-              <div className="min-w-[720px]">
+              <div style={{ minWidth: GRID_MIN_WIDTH_PX }}>
                 <CompareTimetableGrid
                   meetingsA={meetingsA}
                   meetingsB={meetingsB}

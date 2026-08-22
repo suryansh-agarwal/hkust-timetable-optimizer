@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { TimetableGrid } from "./TimetableGrid";
+import { TimetableGrid, GRID_MIN_WIDTH_PX } from "./TimetableGrid";
 import { ResultCard, type OptimizerResult } from "./ResultCard";
 import { Badge } from "@/components/ui/badge";
 import { flattenSchedule, penaltyLabel, bonusLabel, type Bonus, type Penalty } from "@/lib/schedule";
@@ -86,7 +86,7 @@ export function ResultsList({
       {/* simple per-day list view (Stage 6 can be a real grid) */}
       <div className="mt-6">
         <div className="overflow-x-auto">
-          <div className="min-w-[720px]">
+          <div style={{ minWidth: GRID_MIN_WIDTH_PX }}>
             <TimetableGrid meetings={meetings} startHour={8} endHour={20} />
           </div>
         </div>

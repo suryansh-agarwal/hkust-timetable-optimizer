@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
+import { cn } from "@/lib/utils";
 
 type Meeting = {
   day: string;          // "Mo", "Tu", ...
@@ -19,6 +20,8 @@ const DAYS: { key: string; label: string }[] = [
   { key: "Th", label: "Thu" },
   { key: "Fr", label: "Fri" },
 ];
+
+const DAY_LABELS: Record<string, string> = Object.fromEntries(DAYS.map((d) => [d.key, d.label]));
 
 function clamp(n: number, lo: number, hi: number) {
   return Math.max(lo, Math.min(hi, n));
@@ -45,7 +48,7 @@ function blockColors(hueVar: string) {
   return {
     bg: `hsl(var(${hueVar}) / 0.16)`,
     border: `hsl(var(${hueVar}) / 0.55)`,
-    text: `hsl(var(${hueVar}))`,
+    ink: `color-mix(in oklab, hsl(var(${hueVar})), black var(--sub-ink-mix))`,
   };
 }
 
@@ -82,17 +85,116 @@ function assignLanes<T extends Meeting>(meetings: T[]): { placed: (T & { lane: n
   return { placed, laneCount: lanes.length };
 }
 
+const GRID_START_HOUR = 8;
+const GRID_END_HOUR = 20;
+const HOUR_ROW_HEIGHT = 64; // px per hour
+
+/**
+ * The narrowest the grid can render without its columns collapsing: an 80px
+ * time gutter plus five day columns at a 128px floor. Consumers wrap the grid
+ * in a scroll container at this width on narrow screens - see ResultsList and
+ * CompareSection. It lives here because it is this file's geometry.
+ */
+export const GRID_MIN_WIDTH_PX = 720;
+
+function useGridGeometry(startHour = GRID_START_HOUR, endHour = GRID_END_HOUR) {
+  const startMin = startHour * 60;
+  const endMin = endHour * 60;
+  const pxPerMin = HOUR_ROW_HEIGHT / 60;
+  return { startHour, endHour, startMin, endMin, pxPerMin, gridHeight: (endMin - startMin) * pxPerMin };
+}
+
+function GridFrame({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="border border-border rounded-xl overflow-hidden">
+      {children}
+    </div>
+  );
+}
+
+function GridHeaderRow() {
+  return (
+    <div className="grid grid-cols-[80px_repeat(5,1fr)] bg-muted border-b border-border">
+      <div className="p-2.5 font-bold text-xs text-muted-foreground">Time</div>
+      {DAYS.map((d) => (
+        <div key={d.key} className="p-2.5 font-bold">{d.label}</div>
+      ))}
+    </div>
+  );
+}
+
+function TimeAxis({ startHour, endHour, startMin, pxPerMin, gridHeight }: ReturnType<typeof useGridGeometry>) {
+  return (
+    <div className="relative border-r border-border" style={{ height: gridHeight }}>
+      {Array.from({ length: endHour - startHour + 1 }).map((_, i) => {
+        const hour = startHour + i;
+        const y = (hour * 60 - startMin) * pxPerMin;
+        return (
+          <div key={hour} className="absolute text-xs text-muted-foreground" style={{ top: y - 8, left: 10 }}>
+            {hour.toString().padStart(2, "0")}:00
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function DayColumn({ dayKey, startHour, endHour, pxPerMin, gridHeight, children }: {
+  dayKey: string;
+  startHour: number;
+  endHour: number;
+  pxPerMin: number;
+  gridHeight: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className={cn("relative", dayKey !== "Fr" && "border-r border-border")}
+      style={{ height: gridHeight }}
+    >
+      {Array.from({ length: endHour - startHour }).map((_, i) => (
+        <div key={i} className="absolute bg-border" style={{ top: i * 60 * pxPerMin, left: 0, right: 0, height: 1 }} />
+      ))}
+      {children}
+    </div>
+  );
+}
+
+// The row below the header that lays out the time axis and day columns in
+// the same 80px + 5 equal columns template GridHeaderRow uses.
+function GridBody({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="grid grid-cols-[80px_repeat(5,1fr)]">
+      {children}
+    </div>
+  );
+}
+
+/**
+ * Blocks are sized by duration, so a 30-minute class gets 32px and cannot
+ * show three lines. Drop detail as height shrinks rather than shrinking the
+ * type - the full string is on the block's aria-label and title regardless.
+ *
+ * Thresholds come from the content budget, not guesswork. With `p-1.5`
+ * (12px vertical padding), a 2px border on each side (4px total) and
+ * leading-tight: one `text-xs` line needs >= 31px, two lines need >= 46px,
+ * and three lines (the third adds `mt-1` + `text-[11px]`) need >= 63.75px.
+ * 64 carries 0.25px of slack over that budget; 46 is an exact fit with no
+ * slack at all, and since it would take a 43.125-minute meeting to land
+ * exactly on it, that boundary is unreachable on a minute-granular grid.
+ */
+function blockDetail(height: number): "full" | "code-and-section" | "code-only" {
+  if (height >= 64) return "full";
+  if (height >= 46) return "code-and-section";
+  return "code-only";
+}
+
 export function TimetableGrid(props: {
   meetings: Meeting[];
   startHour?: number; // default 8
   endHour?: number;   // default 20
 }) {
-  const startHour = props.startHour ?? 8;
-  const endHour = props.endHour ?? 20;
-
-  const startMin = startHour * 60;
-  const endMin = endHour * 60;
-  const totalMin = endMin - startMin;
+  const { startHour, endHour, startMin, endMin, pxPerMin, gridHeight } = useGridGeometry(props.startHour, props.endHour);
 
   const byDay = useMemo(() => {
     const map: Record<string, Meeting[]> = {};
@@ -119,16 +221,11 @@ export function TimetableGrid(props: {
     return out;
   }, [byDay]);
 
-  // layout constants
-  const hourRowHeight = 64; // px per hour
-  const pxPerMin = hourRowHeight / 60;
-  const gridHeight = totalMin * pxPerMin;
-
   const subjectColors = useMemo(() => {
     const subjects = Array.from(
       new Set(props.meetings.map((m) => getSubjectFromCode(m.course_code)))
     ).sort((a, b) => a.localeCompare(b));
-    const map = new Map<string, { bg: string; border: string; text: string }>();
+    const map = new Map<string, { bg: string; border: string; ink: string }>();
     subjects.forEach((subject, idx) => {
       map.set(subject, SUBJECT_COLORS[idx % SUBJECT_COLORS.length]);
     });
@@ -136,40 +233,17 @@ export function TimetableGrid(props: {
   }, [props.meetings]);
 
   return (
-    <div style={{ border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
-      {/* header */}
-      <div style={{ display: "grid", gridTemplateColumns: `80px repeat(5, 1fr)`, background: "var(--surface-2)", borderBottom: "1px solid var(--border-subtle)" }}>
-        <div style={{ padding: 10, fontWeight: 700, fontSize: 12, color: "var(--text-muted)" }}>Time</div>
-        {DAYS.map((d) => (
-          <div key={d.key} style={{ padding: 10, fontWeight: 700 }}>{d.label}</div>
-        ))}
-      </div>
+    <GridFrame>
+      <GridHeaderRow />
 
-      <div style={{ display: "grid", gridTemplateColumns: `80px repeat(5, 1fr)` }}>
-        {/* time axis */}
-        <div style={{ position: "relative", height: gridHeight, borderRight: "1px solid var(--border-subtle)" }}>
-          {Array.from({ length: endHour - startHour + 1 }).map((_, i) => {
-            const hour = startHour + i;
-            const y = (hour * 60 - startMin) * pxPerMin;
-            return (
-              <div key={hour} style={{ position: "absolute", top: y - 8, left: 10, fontSize: 12, color: "var(--text-muted)" }}>
-                {hour.toString().padStart(2, "0")}:00
-              </div>
-            );
-          })}
-        </div>
+      <GridBody>
+        <TimeAxis startHour={startHour} endHour={endHour} startMin={startMin} endMin={endMin} pxPerMin={pxPerMin} gridHeight={gridHeight} />
 
         {/* day columns */}
         {DAYS.map((d) => {
           const { placed, laneCount } = packed[d.key];
           return (
-            <div key={d.key} style={{ position: "relative", height: gridHeight, borderRight: d.key !== "Fr" ? "1px solid var(--border-subtle)" : undefined }}>
-              {/* hour lines */}
-              {Array.from({ length: endHour - startHour }).map((_, i) => {
-                const y = (i * 60) * pxPerMin;
-                return <div key={i} style={{ position: "absolute", top: y, left: 0, right: 0, height: 1, background: "var(--border-faint)" }} />;
-              })}
-
+            <DayColumn key={d.key} dayKey={d.key} startHour={startHour} endHour={endHour} pxPerMin={pxPerMin} gridHeight={gridHeight}>
               {/* blocks */}
               {placed.map((m, idx) => {
                 const top = (m.start_min - startMin) * pxPerMin;
@@ -184,10 +258,21 @@ export function TimetableGrid(props: {
                 const subject = getSubjectFromCode(m.course_code);
                 const colors = subjectColors.get(subject) ?? SUBJECT_COLORS[0];
 
+                const label = `${m.course_code} ${m.section}, ${DAY_LABELS[m.day] ?? m.day} ${minutesToHHMM(m.start_min)} to ${minutesToHHMM(m.end_min)}`;
+                const detail = blockDetail(height);
+
                 return (
                   <div
                     key={idx}
-                    title={`${m.course_code} ${m.section}\n${m.day} ${minutesToHHMM(m.start_min)}–${minutesToHHMM(m.end_min)}`}
+                    data-slot="grid-block"
+                    role="group"
+                    tabIndex={0}
+                    aria-label={label}
+                    title={label}
+                    className={cn(
+                      "shadow-[var(--elev-1)] transition-shadow duration-150 hover:shadow-[var(--shadow-md)]",
+                      detail === "code-only" ? "px-1.5 py-px" : "p-1.5"
+                    )}
                     style={{
                       position: "absolute",
                       top,
@@ -196,26 +281,28 @@ export function TimetableGrid(props: {
                       width: `calc(${laneWidthPct}% - ${gap}px)`,
                       borderRadius: 10,
                       border: `2px solid ${colors.border}`,
-                      padding: 8,
                       fontSize: 12,
                       background: colors.bg,
-                      boxShadow: "var(--shadow-sm)",
                       overflow: "hidden",
                     }}
                   >
-                    <div style={{ fontWeight: 800, fontSize: 12, color: colors.text }}>{m.course_code}</div>
-                    <div style={{ fontSize: 12, color: colors.text, opacity: 0.85 }}>{m.section}</div>
-                    <div style={{ fontSize: 11, color: colors.text, opacity: 0.75, marginTop: 4 }}>
-                      {minutesToHHMM(m.start_min)}–{minutesToHHMM(m.end_min)}
-                    </div>
+                    <div className="text-xs font-bold leading-tight" style={{ color: colors.ink }}>{m.course_code}</div>
+                    {detail !== "code-only" && (
+                      <div className="text-xs leading-tight" style={{ color: colors.ink }}>{m.section}</div>
+                    )}
+                    {detail === "full" && (
+                      <div className="mt-1 text-[11px] leading-tight" style={{ color: colors.ink }}>
+                        {minutesToHHMM(m.start_min)}–{minutesToHHMM(m.end_min)}
+                      </div>
+                    )}
                   </div>
                 );
               })}
-            </div>
+            </DayColumn>
           );
         })}
-      </div>
-    </div>
+      </GridBody>
+    </GridFrame>
   );
 }
 
@@ -226,12 +313,7 @@ export function CompareTimetableGrid(props: {
   startHour?: number;
   endHour?: number;
 }) {
-  const startHour = props.startHour ?? 8;
-  const endHour = props.endHour ?? 20;
-
-  const startMin = startHour * 60;
-  const endMin = endHour * 60;
-  const totalMin = endMin - startMin;
+  const { startHour, endHour, startMin, endMin, pxPerMin, gridHeight } = useGridGeometry(props.startHour, props.endHour);
 
   // Track which side is being hovered (null = show both)
   const [hoveredSide, setHoveredSide] = useState<"A" | "B" | null>(null);
@@ -268,49 +350,22 @@ export function CompareTimetableGrid(props: {
     return out;
   }, [byDay]);
 
-  const hourRowHeight = 64;
-  const pxPerMin = hourRowHeight / 60;
-  const gridHeight = totalMin * pxPerMin;
-
   // Color schemes
   const colorA = blockColors("--cmp-a");
   const colorB = blockColors("--cmp-b");
 
   return (
-    <div style={{ border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
-      {/* header */}
-      <div style={{ display: "grid", gridTemplateColumns: `80px repeat(5, 1fr)`, background: "var(--surface-2)", borderBottom: "1px solid var(--border-subtle)" }}>
-        <div style={{ padding: 10, fontWeight: 700, fontSize: 12, color: "var(--text-muted)" }}>Time</div>
-        {DAYS.map((d) => (
-          <div key={d.key} style={{ padding: 10, fontWeight: 700 }}>{d.label}</div>
-        ))}
-      </div>
+    <GridFrame>
+      <GridHeaderRow />
 
-      <div style={{ display: "grid", gridTemplateColumns: `80px repeat(5, 1fr)` }}>
-        {/* time axis */}
-        <div style={{ position: "relative", height: gridHeight, borderRight: "1px solid var(--border-subtle)" }}>
-          {Array.from({ length: endHour - startHour + 1 }).map((_, i) => {
-            const hour = startHour + i;
-            const y = (hour * 60 - startMin) * pxPerMin;
-            return (
-              <div key={hour} style={{ position: "absolute", top: y - 8, left: 10, fontSize: 12, color: "var(--text-muted)" }}>
-                {hour.toString().padStart(2, "0")}:00
-              </div>
-            );
-          })}
-        </div>
+      <GridBody>
+        <TimeAxis startHour={startHour} endHour={endHour} startMin={startMin} endMin={endMin} pxPerMin={pxPerMin} gridHeight={gridHeight} />
 
         {/* day columns */}
         {DAYS.map((d) => {
           const { placed, laneCount } = packed[d.key];
           return (
-            <div key={d.key} style={{ position: "relative", height: gridHeight, borderRight: d.key !== "Fr" ? "1px solid var(--border-subtle)" : undefined }}>
-              {/* hour lines */}
-              {Array.from({ length: endHour - startHour }).map((_, i) => {
-                const y = i * 60 * pxPerMin;
-                return <div key={i} style={{ position: "absolute", top: y, left: 0, right: 0, height: 1, background: "var(--border-faint)" }} />;
-              })}
-
+            <DayColumn key={d.key} dayKey={d.key} startHour={startHour} endHour={endHour} pxPerMin={pxPerMin} gridHeight={gridHeight}>
               {/* blocks */}
               {placed.map((m, idx) => {
                 const top = (m.start_min - startMin) * pxPerMin;
@@ -323,16 +378,29 @@ export function CompareTimetableGrid(props: {
 
                 const colors = m.side === "A" ? colorA : colorB;
 
-                // Determine opacity based on hover state
-                const isHiddenBecauseHover = hoveredSide !== null && hoveredSide !== m.side;
-                const opacity = isHiddenBecauseHover ? 0.1 : 1;
+                // Determine opacity based on hover/focus state
+                const isDimmedByHover = hoveredSide !== null && hoveredSide !== m.side;
+                const opacity = isDimmedByHover ? 0.25 : 1;
+
+                const label = `Option ${m.side}, ${m.course_code} ${m.section}, ${DAY_LABELS[m.day] ?? m.day} ${minutesToHHMM(m.start_min)} to ${minutesToHHMM(m.end_min)}`;
+                const detail = blockDetail(height);
 
                 return (
                   <div
                     key={`${m.side}-${idx}`}
-                    title={`[${m.side}] ${m.course_code} ${m.section}\n${m.day} ${minutesToHHMM(m.start_min)}–${minutesToHHMM(m.end_min)}`}
+                    data-slot="grid-block"
+                    role="group"
+                    tabIndex={0}
+                    aria-label={label}
+                    title={label}
+                    className={cn(
+                      "shadow-[var(--elev-1)] transition-[opacity,box-shadow] duration-150 ease-in-out hover:shadow-[var(--shadow-md)]",
+                      detail === "code-only" ? "px-1.5 py-px" : "p-1.5"
+                    )}
                     onMouseEnter={() => setHoveredSide(m.side)}
                     onMouseLeave={() => setHoveredSide(null)}
+                    onFocus={() => setHoveredSide(m.side)}
+                    onBlur={() => setHoveredSide(null)}
                     style={{
                       position: "absolute",
                       top,
@@ -341,29 +409,29 @@ export function CompareTimetableGrid(props: {
                       width: `calc(${laneWidthPct}% - ${gap}px)`,
                       borderRadius: 10,
                       border: `2px solid ${colors.border}`,
-                      padding: 8,
                       fontSize: 12,
                       background: colors.bg,
-                      boxShadow: "var(--shadow-sm)",
                       overflow: "hidden",
                       opacity,
-                      transition: "opacity 0.15s ease-in-out",
-                      cursor: "pointer",
                       zIndex: hoveredSide === m.side ? 10 : 1,
                     }}
                   >
-                    <div style={{ fontWeight: 800, fontSize: 12, color: colors.text }}>{m.course_code}</div>
-                    <div style={{ fontSize: 12, color: colors.text, opacity: 0.8 }}>{m.section}</div>
-                    <div style={{ fontSize: 11, color: colors.text, opacity: 0.7, marginTop: 4 }}>
-                      {minutesToHHMM(m.start_min)}–{minutesToHHMM(m.end_min)}
-                    </div>
+                    <div className="text-xs font-bold leading-tight" style={{ color: colors.ink }}>{m.course_code}</div>
+                    {detail !== "code-only" && (
+                      <div className="text-xs leading-tight" style={{ color: colors.ink }}>{m.section}</div>
+                    )}
+                    {detail === "full" && (
+                      <div className="mt-1 text-[11px] leading-tight" style={{ color: colors.ink }}>
+                        {minutesToHHMM(m.start_min)}–{minutesToHHMM(m.end_min)}
+                      </div>
+                    )}
                   </div>
                 );
               })}
-            </div>
+            </DayColumn>
           );
         })}
-      </div>
-    </div>
+      </GridBody>
+    </GridFrame>
   );
 }

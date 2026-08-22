@@ -98,7 +98,9 @@ Every task's requirements implicitly include this section.
 
 **Interfaces:**
 - Consumes: nothing from earlier tasks.
-- Produces: `GRID_START_HOUR`, `GRID_END_HOUR`, `HOUR_ROW_HEIGHT`, `useGridGeometry`, `<GridFrame>`, `<GridHeaderRow>`, `<TimeAxis>`, `<DayColumn>`. Tasks 2–6 edit these instead of two copies of the same markup.
+- Produces: `GRID_START_HOUR`, `GRID_END_HOUR`, `HOUR_ROW_HEIGHT`, `useGridGeometry`, `<GridFrame>`, `<GridHeaderRow>`, `<GridBody>`, `<TimeAxis>`, `<DayColumn>`. Tasks 2–6 edit these instead of two copies of the same markup.
+
+**Five pieces, not four.** An earlier draft of this task listed four and still expected `grep -c "repeat(5, 1fr)"` to return 2 — inconsistent, because the `display:grid` body-row wrapper is duplicated too. `GridBody` is that wrapper. It is not exported; nothing outside the file uses it.
 
 `TimetableGrid` (`:85`) and `CompareTimetableGrid` (`:223`) render byte-identical chrome: the same outer bordered box, the same `80px repeat(5, 1fr)` header, the same time axis, the same hour lines. Migrating tokens twice is how the two drift apart, and verbatim duplication of a logic block is a defect the review rubric flags on sight. This task is a pure refactor: **no rendered output may change.**
 
@@ -192,6 +194,14 @@ function TimeAxis({ startHour, endHour, startMin, pxPerMin, gridHeight }: Return
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function GridBody({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: `80px repeat(5, 1fr)` }}>
+      {children}
     </div>
   );
 }
@@ -294,9 +304,9 @@ Apply exactly this mapping. Each target is the token the alias already resolves 
 | `fontWeight: 700` | `font-bold` | direct |
 | `fontSize: 12` | `text-xs` | direct |
 | `color: "var(--text-muted)"` | `text-muted-foreground` | `--text-muted` is defined as `var(--muted-foreground)` |
-| `boxShadow: "var(--shadow-sm)"` | `shadow-sm` | see the note below |
+| ~~`boxShadow: "var(--shadow-sm)"`~~ | — | **not in this task.** Both occurrences are in the block markup, not the chrome. Moved to Task 4, which is already changing the block's shadow. |
 
-**On `--shadow-sm`.** The app defines `--shadow-sm` at `:root`, which collides with Tailwind v4's own theme variable of that name — a carry-over flagged back in stage 2 and never resolved. Switching to Tailwind's `shadow-sm` utility and letting Task 6 delete the custom property ends the collision. The two values are close (`0 1px 3px oklch(0 0 0 / 0.08)` against Tailwind's default) but not identical; confirm against the screenshot and say in the report whether any difference is visible.
+**On `--shadow-sm`.** It is the one alias this task does not clear, because it is not in the chrome — see the struck row above. Task 4 handles it.
 
 - [ ] **Step 1: Re-establish the baseline**
 
@@ -304,7 +314,7 @@ Same scaffolding as Task 1 Step 1 — background dev server, `preview-tmp` route
 
 - [ ] **Step 2: Apply the mapping to the four chrome pieces**
 
-Work through `GridFrame`, `GridHeaderRow`, `TimeAxis` and `DayColumn`. `TimeAxis` and `DayColumn` keep `position`, `top`, `height`, `left`, `right` in `style` — those are geometry. Do not mix a `style` colour with a `className` colour on the same element.
+Work through `GridFrame`, `GridHeaderRow`, `GridBody`, `TimeAxis` and `DayColumn`. **`GridBody` is easy to miss** — it was added late to Task 1 and carries the second `gridTemplateColumns`. `TimeAxis` and `DayColumn` keep `position`, `top`, `height`, `left`, `right` in `style` — those are geometry. Do not mix a `style` colour with a `className` colour on the same element.
 
 - [ ] **Step 3: Confirm the chrome is clean**
 
@@ -312,7 +322,7 @@ Work through `GridFrame`, `GridHeaderRow`, `TimeAxis` and `DayColumn`. `TimeAxis
 cd web && grep -n 'border-subtle\|border-faint\|surface-2\|shadow-sm\|text-muted' app/components/TimetableGrid.tsx
 ```
 
-Expected: only hits inside the block markup, which Task 3 owns. Zero hits in the four chrome components. If a chrome hit survives, the mapping was applied incompletely.
+Expected: only hits inside the block markup, which Task 3 owns. Zero hits in the five chrome components. If a chrome hit survives, the mapping was applied incompletely.
 
 - [ ] **Step 4: Compare against the baseline**
 
@@ -348,7 +358,7 @@ classNames."
 
 **Files:**
 - Modify: `web/app/components/TimetableGrid.tsx`, `web/app/globals.css`
-- Test: `web/lib/__tests__/` — add `subject-ink.test.ts`
+- Test: `web/lib/subject-ink.test.ts`
 
 **Interfaces:**
 - Consumes: the chrome from Tasks 1–2.
@@ -360,7 +370,7 @@ This is the accessibility fix. Four light-mode hues fail AA as labels on their o
 
 The contrast rule is arithmetic, so it can be tested without a browser. The test **reads `globals.css`** rather than restating the hue values — a test that hard-codes them would keep passing after someone retunes a hue, which is the exact regression worth guarding against, and it would also pass before the token exists, giving no red.
 
-Create `web/lib/__tests__/subject-ink.test.ts`:
+Create `web/lib/subject-ink.test.ts` — flat in `lib/`, matching `schedule.test.ts` and `sectionOptions.test.ts`; vitest is configured `include: ["lib/**/*.test.ts"]` with `environment: "node"`, so `node:fs` works and `process.cwd()` is `web/`:
 
 ```ts
 import { readFileSync } from "node:fs";
@@ -463,7 +473,7 @@ describe("subject block ink meets WCAG AA on its own fill", () => {
 - [ ] **Step 2: Run it and watch it fail**
 
 ```bash
-cd web && npx vitest run lib/__tests__/subject-ink.test.ts
+cd web && npx vitest run lib/subject-ink.test.ts
 ```
 
 Expected: the two per-theme cases fail with **`--sub-ink-mix is not declared`**, because Step 3 has not added it yet. That is the red — the test reads the shipped stylesheet, so it cannot pass ahead of the implementation.
@@ -521,7 +531,7 @@ In both components' block markup, all three lines take `colors.ink` with **no `o
 - [ ] **Step 6: Run the test again**
 
 ```bash
-cd web && npx vitest run lib/__tests__/subject-ink.test.ts
+cd web && npx vitest run lib/subject-ink.test.ts
 ```
 
 Expected: all four pass.
@@ -548,7 +558,7 @@ cd web && rm -rf .next && ./node_modules/.bin/tsc --noEmit && npx eslint . && np
 Expected: 46 vitest tests now (42 + 4).
 
 ```bash
-git add web/app/components/TimetableGrid.tsx web/app/globals.css web/lib/__tests__/subject-ink.test.ts
+git add web/app/components/TimetableGrid.tsx web/app/globals.css web/lib/subject-ink.test.ts
 git commit -m "fix(web): bring the subject block labels up to WCAG AA
 
 Blocks put the label on a 16% wash of its own hue, so four light-mode
@@ -614,11 +624,13 @@ Do **not** make the block a `<button>`. It performs no action; a button that doe
 
 - [ ] **Step 3: Hover affordance on both grids**
 
-The main grid gives no hover feedback; the compare grid sets `cursor: pointer` on something that is not clickable. Settle on one recipe for both — a shadow lift, no cursor change:
+The main grid gives no hover feedback; the compare grid sets `cursor: pointer` on something that is not clickable. Settle on one recipe for both — a shadow lift, no cursor change. **This is also where `--shadow-sm` retires**, the last of the five legacy aliases: the block currently sets `boxShadow: "var(--shadow-sm)"` inline (two occurrences). Replace it with the utility in the same className, so the block's resting and hover shadows are one recipe:
 
 ```tsx
-className="transition-shadow duration-150 hover:shadow-md"
+className="shadow-sm transition-shadow duration-150 hover:shadow-md"
 ```
+
+The app declares `--shadow-sm` at `:root`, colliding with Tailwind v4's own theme variable of that name — a carry-over flagged in stage 2 and never resolved. Moving to the utility here is what lets Task 6 delete the custom property. The two values are close but not identical (`0 1px 3px oklch(0 0 0 / 0.08)` against Tailwind's default); check it against a screenshot and report whether any difference is visible.
 
 Remove `cursor: "pointer"` from `CompareTimetableGrid`'s block style. Nothing there is clickable, and a pointer cursor promises otherwise.
 

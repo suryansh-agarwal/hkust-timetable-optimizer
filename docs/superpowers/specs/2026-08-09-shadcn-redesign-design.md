@@ -288,3 +288,68 @@ the stage's scratch ledger, which is deleted when the stage merges.
   touches most. Worth deciding before stage 4 rather than after.
 - The scale table in the stage 3c plan still reads `px-6` for the page
   container; the shipped value is `px-4 py-5 lg:px-6`.
+
+## Carried beyond stage 4
+
+Stage 4 completed the adoption: the grid is on shadcn tokens, its labels meet
+WCAG AA, blocks are focusable and named, and the last five legacy aliases are
+gone. These are what its reviews raised and deliberately did not fix. They are
+recorded here because the stage's scratch ledger is deleted at merge.
+
+**Do this first, before a fifth round of paired edits.** The block-rendering
+closure is duplicated verbatim between `TimetableGrid` and `CompareTimetableGrid`.
+Stage 4 extracted the *chrome* around it but left this larger duplicate, and
+then four separate tasks edited it twice each. Nothing drifted — every surviving
+difference is behavioural — but that held because each task was reviewed against
+both copies. Extract a `<GridBlock>` (props: `colors`, `label`, `detail`,
+geometry, plus an optional slot for the compare grid's `opacity`/`zIndex`/focus
+handlers) as the first task of whatever touches this file next.
+
+**A real, if narrow, visual defect.** The main grid has no `z-index` on its
+blocks, and the focus outline (2px at 2px offset = 4px outward) exceeds the 3px
+half-gap between lanes. With two or more overlapping classes in a day, the outer
+~1px of a focused block's ring is overpainted by the next-lane block. The compare
+grid is already immune — `onFocus` sets `hoveredSide`, which sets `zIndex: 10`.
+One `focus-visible:z-10` on the main grid's block fixes it, and doubles as the
+structural guarantee the ring currently lacks: nothing today stops a future
+ancestor `overflow` change from clipping it silently.
+
+**A pre-existing overlap, now measured.** A 15-minute meeting immediately
+followed by another overlaps the next block by 6px, its border crossing the
+title — the `Math.max(22, …)` floor exceeds a 15-minute duration's natural 16px.
+Raising the floor to 32 was tried and rejected: it widened the overlap to 16px.
+A real fix has to reduce the floor and shrink what a floor-height block renders,
+or let very short blocks shift rather than grow.
+
+**Tidy-ups, all lossless.**
+
+- The block wrapper still carries `borderRadius: 10`, `fontSize: 12` and
+  `overflow: "hidden"` inline. `rounded-lg` resolves to `var(--radius-lg)` =
+  `0.625rem` = exactly 10px, so the swap is exact; `fontSize: 12` is dead, since
+  all three children set their own size. The chrome has the same shape:
+  `left: 10` on the hour label (`left-2.5`) and `left: 0, right: 0, height: 1`
+  on the hour line (`inset-x-0 h-px`). Do them together so the file ends
+  consistent.
+- `TimeAxis` accepts `ReturnType<typeof useGridGeometry>` but never reads
+  `endMin`, while `DayColumn` hand-writes a subset type for the same data. Two
+  typing styles for one concept.
+- `FILL_ALPHA = 0.16` in `lib/subject-ink.test.ts` is the one value the test
+  cannot read from source, because the fill alpha lives in TSX. Close the loop
+  with `expect(readFileSync("app/components/TimetableGrid.tsx","utf8")).toContain("/ 0.16)")`.
+- `ResultsList` and `CompareSection` pass `startHour={8} endHour={20}`,
+  duplicating the module-private `GRID_START_HOUR`/`GRID_END_HOUR`. Export them
+  or drop the props and let the defaults apply.
+- `colorA`/`colorB` are rebuilt every render in `CompareTimetableGrid` while the
+  sibling `subjectColors` is memoized. Costs nothing; it is the one place the two
+  components' colour derivation is stylistically unlike.
+- `CompareTimetableGrid`'s `ease-in-out` is redundant — Tailwind's
+  `--default-transition-timing-function` is the same curve — so the two grids
+  animate identically despite reading differently.
+- `rounded-xl` on the frame is 14px where the pre-stage inline value was 12px.
+  Measured and accepted; noted so nobody rediscovers it as a regression.
+
+**Known and deliberate.** The compare grid dims the non-focused side to 0.25,
+where its label measures ~1.7–1.9:1. That is de-emphasis, not content — the
+focused side is always at full opacity — so no AA gate applies. And on touch,
+tapping a compare block dims the other side until you tap elsewhere, because
+`onMouseEnter` still fires from emulated events. Both pre-date stage 4.
