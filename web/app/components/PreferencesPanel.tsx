@@ -61,7 +61,7 @@ export function PreferencesPanel({
   }, []);
 
   return (
-    <Card className="max-h-none overflow-y-auto p-5 lg:max-h-[520px]">
+    <Card className="max-h-none overflow-visible p-5 lg:max-h-[520px] lg:overflow-y-auto">
       <h2 className="text-lg font-semibold">Preferences</h2>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
