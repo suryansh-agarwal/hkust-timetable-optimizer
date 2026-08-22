@@ -283,7 +283,7 @@ export default function Home() {
       setResult(data);
       const resultCount = data?.results?.length ?? 0;
       if (resultCount === 0) {
-        toast.error("Timetable not possible with current subjects");
+        toast.error("Timetable not possible with current subjects/sections");
       } else {
         setDidJustOptimize(true);
       }
@@ -314,7 +314,7 @@ export default function Home() {
       />
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card className="p-5">
-          <div className="mb-3">
+          <div>
             <Label htmlFor="term-select" className="mb-2 block text-sm font-semibold">Term</Label>
             <Select
               value={term}
@@ -341,7 +341,7 @@ export default function Home() {
             sectionLocks={sectionLocks}
             setSectionLocks={setSectionLocks}
           />
-          <p className="mt-1 text-sm">
+          <p className="text-sm">
             <span className="font-semibold">Selected:</span> {selectedCourses.join(", ")}
           </p>
         </Card>
