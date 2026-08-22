@@ -166,10 +166,17 @@ function GridBody({ children }: { children: React.ReactNode }) {
  * Blocks are sized by duration, so a 30-minute class gets 32px and cannot
  * show three lines. Drop detail as height shrinks rather than shrinking the
  * type - the full string is on the block's aria-label and title regardless.
+ *
+ * Thresholds come from the content budget, not guesswork. With `p-1.5`
+ * (12px vertical padding), a 2px border on each side (4px total) and
+ * leading-tight: one `text-xs` line needs >= 31px, two lines need >= 46px,
+ * and three lines (the third adds `mt-1` + `text-[11px]`) need >= 63.75px.
+ * Rounded up to 64 / 46 so the boundary duration clears its budget rather
+ * than landing exactly on it.
  */
 function blockDetail(height: number): "full" | "code-and-section" | "code-only" {
-  if (height >= 56) return "full";
-  if (height >= 36) return "code-and-section";
+  if (height >= 64) return "full";
+  if (height >= 46) return "code-and-section";
   return "code-only";
 }
 
@@ -252,7 +259,10 @@ export function TimetableGrid(props: {
                     tabIndex={0}
                     aria-label={label}
                     title={label}
-                    className="shadow-sm transition-shadow duration-150 hover:shadow-md p-1.5"
+                    className={cn(
+                      "shadow-sm transition-shadow duration-150 hover:shadow-md",
+                      detail === "code-only" ? "px-1.5 py-px" : "p-1.5"
+                    )}
                     style={{
                       position: "absolute",
                       top,
@@ -372,7 +382,10 @@ export function CompareTimetableGrid(props: {
                     tabIndex={0}
                     aria-label={label}
                     title={label}
-                    className="shadow-sm transition-[opacity,box-shadow] duration-150 ease-in-out hover:shadow-md p-1.5"
+                    className={cn(
+                      "shadow-sm transition-[opacity,box-shadow] duration-150 ease-in-out hover:shadow-md",
+                      detail === "code-only" ? "px-1.5 py-px" : "p-1.5"
+                    )}
                     onMouseEnter={() => setHoveredSide(m.side)}
                     onMouseLeave={() => setHoveredSide(null)}
                     onFocus={() => setHoveredSide(m.side)}
