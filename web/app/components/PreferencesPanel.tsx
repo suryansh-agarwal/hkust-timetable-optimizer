@@ -42,12 +42,19 @@ export function PreferencesPanel({
   // in one column. Read after mount rather than during render - the server
   // has no viewport, and branching on one would be a hydration mismatch.
   const [openByDefault, setOpenByDefault] = useState(true);
+  // True until the mount effect below runs. The server renders the panels open
+  // because it has no viewport, so on a phone the first paint would show ~30
+  // controls that the effect then collapses. While this is true the content is
+  // hidden below lg, so that frame never reaches the screen. At lg and above
+  // the class does not apply and the desktop render is untouched.
+  const [beforeHydration, setBeforeHydration] = useState(true);
   useEffect(() => {
     // One-time sync with the browser's viewport on mount. This is the
     // documented exception to the rule below: reading it during render
     // would be a hydration mismatch.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setOpenByDefault(window.matchMedia("(min-width: 1024px)").matches);
+    setBeforeHydration(false);
   }, []);
 
   return (
@@ -98,7 +105,7 @@ export function PreferencesPanel({
               </CardAction>
             </CardHeader>
 
-            <CollapsibleContent>
+            <CollapsibleContent className={beforeHydration ? "max-lg:hidden" : undefined}>
               <CardContent className="flex flex-col gap-4">
                 {/* Hard Free Days (multi-select) */}
                 <div>
@@ -182,7 +189,7 @@ export function PreferencesPanel({
               </CardAction>
             </CardHeader>
 
-            <CollapsibleContent>
+            <CollapsibleContent className={beforeHydration ? "max-lg:hidden" : undefined}>
               <CardContent className="flex flex-col gap-4">
                 {/* Soft Free Days (multi-select) */}
                 <div>
