@@ -89,6 +89,14 @@ const GRID_START_HOUR = 8;
 const GRID_END_HOUR = 20;
 const HOUR_ROW_HEIGHT = 64; // px per hour
 
+/**
+ * The narrowest the grid can render without its columns collapsing: an 80px
+ * time gutter plus five day columns at a 128px floor. Consumers wrap the grid
+ * in a scroll container at this width on narrow screens - see ResultsList and
+ * CompareSection. It lives here because it is this file's geometry.
+ */
+export const GRID_MIN_WIDTH_PX = 720;
+
 function useGridGeometry(startHour = GRID_START_HOUR, endHour = GRID_END_HOUR) {
   const startMin = startHour * 60;
   const endMin = endHour * 60;

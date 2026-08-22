@@ -52,7 +52,6 @@
   --success: oklch(0.5500 0.1400 150.00);
 
   --overlay: oklch(0 0 0 / 0.35);
-  --shadow-sm: 0 1px 3px oklch(0 0 0 / 0.08);
   --shadow-md: 0 2px 10px oklch(0 0 0 / 0.08);
 
   --login-canvas: linear-gradient(135deg, oklch(0.9800 0.0040 250) 0%, oklch(0.9550 0.0090 255) 100%);
@@ -82,10 +81,6 @@
 
   /* --- Legacy aliases. Deleted per-file as later stages migrate. --- */
   --surface: var(--card);
-  --surface-2: var(--muted);
-  --border-subtle: var(--border);
-  --border-faint: var(--border);
-  --text-muted: var(--muted-foreground);
   /* Not aliased to --destructive: that is shadcn's fill red for button
      backgrounds, and as text it measures 3.76:1 on white. This app uses
      --danger for text. */
@@ -140,7 +135,6 @@
   --success: oklch(0.7200 0.1600 150.00);
 
   --overlay: oklch(0 0 0 / 0.60);
-  --shadow-sm: 0 1px 3px oklch(0 0 0 / 0.50);
   --shadow-md: 0 2px 12px oklch(0 0 0 / 0.55);
 
   --login-canvas: linear-gradient(135deg, oklch(0.1371 0.0360 258.53) 0%, oklch(0.2000 0.0350 259) 100%);
