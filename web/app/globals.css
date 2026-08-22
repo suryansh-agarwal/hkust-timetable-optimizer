@@ -9,10 +9,14 @@
  * Theme tokens.
  *
  * Two groups live here. The shadcn set (--background, --card, --primary and
- * friends) is what generated components consume. The legacy set (--surface,
- * --text-muted and friends) is what this app's 237 inline styles consume; it
- * is defined purely as aliases onto the shadcn set, and each alias is deleted
- * as its consumers migrate in later stages.
+ * friends) is what generated components consume. What remains of the legacy
+ * set is app-specific rather than an alias: --surface, the --danger family,
+ * --pin-*, --success-*, --overlay, --login-* and the --sub-N subject hues.
+ *
+ * The alias layer is gone. --border-subtle, --border-faint, --surface-2,
+ * --shadow-sm and --text-muted existed only to keep inline styles alive
+ * through the shadcn migration, and stage 4 removed the last of them with
+ * their final consumer.
  *
  * Base palette is shadcn "slate", chosen over neutral because the primary is
  * HKUST navy and a chroma-0 grey sits badly against it.
