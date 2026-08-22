@@ -224,7 +224,7 @@ function GridBlock({
       aria-label={label}
       title={label}
       className={cn(
-        "shadow-[var(--elev-1)] hover:shadow-[var(--shadow-md)]",
+        "shadow-[var(--elev-1)] hover:shadow-[var(--shadow-md)] focus-visible:z-10",
         transitionClass,
         detail === "code-only" ? "px-1.5 py-px" : "p-1.5"
       )}
