@@ -126,9 +126,7 @@ message sends a student to remove a course when the fix is to clear a pin.
 
 New string, verbatim:
 
-> `Timetable is not possible with current subjects/sections`
-
-Note this also adds "is", which the current string lacks.
+> `Timetable not possible with current subjects/sections`
 
 ## Explicitly out of scope
 
