@@ -4,8 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import {
-  bonusLabel, computeStatsFromMeetings, flattenSchedule, formatDayList, minutesToTime, penaltyLabel,
-  type Bonus, type Penalty,
+  bonusLabel, comparativeChips, formatDayList, minutesToTime, penaltyLabel,
+  type Bonus, type Penalty, type ScheduleStats, type SetExtremes,
 } from "@/lib/schedule";
 
 export type OptimizerResult = {
@@ -28,6 +28,8 @@ const MIN_SPAN = 20;
 export function ResultCard({
   result,
   index,
+  stats,
+  extremes,
   bestScore,
   worstScore,
   isActive,
@@ -37,6 +39,8 @@ export function ResultCard({
 }: Readonly<{
   result: OptimizerResult;
   index: number;
+  stats: ScheduleStats;
+  extremes: SetExtremes | null;
   bestScore: number;
   worstScore: number;
   isActive: boolean;
@@ -44,14 +48,24 @@ export function ResultCard({
   onSelect: () => void;
   onPin: () => void;
 }>) {
-  const ms = flattenSchedule(result.schedule);
-  const stats = computeStatsFromMeetings(ms);
 
   // The gaps penalty and the free-days bonus are already stated exactly
   // above as "Gaps: N min" and "Free days: N (...)", so as chips they only
   // repeat the numbers in a noisier form.
   const penalties = ((result.breakdown?.penalties ?? []) as Penalty[]).filter((p) => p.type !== "gaps_minutes");
   const bonuses = ((result.breakdown?.bonuses ?? []) as Bonus[]).filter((b) => b.type !== "free_days");
+
+  // Where this option stands against the others returned with it. The chips
+  // above only fire for soft preferences a student explicitly set, so with
+  // none set they are always empty and the card said nothing at all.
+  // The chip row holds three at most; breakdown chips come first because they
+  // answer a question the student actually asked, then comparatives fill the
+  // remainder. Sliced once here so the row does not restate the limits.
+  const shownPenalties = penalties.slice(0, 3);
+  const shownBonuses = bonuses.slice(0, 2);
+  const shownComparative = comparativeChips(stats, extremes)
+    .slice(0, Math.max(0, 3 - shownPenalties.length - shownBonuses.length));
+  const noChips = shownPenalties.length + shownBonuses.length + shownComparative.length === 0;
 
   // The bar measures how far this option falls behind the best one, against
   // the spread of the returned set - but with a floor under that spread.
@@ -137,7 +151,7 @@ export function ResultCard({
 
       {/* quick breakdown chips */}
       <div className="flex flex-wrap gap-2">
-        {penalties.slice(0, 3).map((p, idx: number) => (
+        {shownPenalties.map((p, idx: number) => (
           <Badge
             key={`p-${idx}`}
             variant="outline"
@@ -147,13 +161,26 @@ export function ResultCard({
             ❌ {penaltyLabel(p)}
           </Badge>
         ))}
-        {bonuses.slice(0, 2).map((b, idx: number) => (
+        {shownBonuses.map((b, idx: number) => (
           <Badge key={`b-${idx}`} variant="secondary" title={JSON.stringify(b)}>
             ✅ {bonusLabel(b)}
           </Badge>
         ))}
-        {penalties.length === 0 && bonuses.length === 0 && (
-          <span className="text-xs text-muted-foreground">No notable tradeoffs</span>
+        {shownComparative.map((c, idx: number) => (
+          <Badge
+            key={`c-${idx}`}
+            variant="outline"
+            className={
+              c.tone === "bad"
+                ? "border-[var(--danger-border)] bg-[var(--danger-chip-bg)] text-[var(--danger)]"
+                : ""
+            }
+          >
+            {c.label}
+          </Badge>
+        ))}
+        {noChips && (
+          <span className="text-xs text-muted-foreground">All options are similar</span>
         )}
       </div>
     </Card>

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useMemo, type ReactNode } from "react";
 import { loadCourseIndex, searchCourseIndex, getIndexCacheStatus, getCourseFromIndex, fetchCourseSections, CourseIndexEntry } from "@/lib/api";
 import type { CourseSections, SectionLock } from "@/lib/api";
-import { optionsFor, reconcilePins, matchingAppliesTo } from "@/lib/sectionOptions";
+import { optionsFor, reconcilePins, matchingAppliesTo, summariseMeetings } from "@/lib/sectionOptions";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
@@ -22,12 +22,6 @@ import { Search, X } from "lucide-react";
 
 function samePins(a: SectionLock, b: SectionLock) {
   return a.lecture === b.lecture && a.tutorial === b.tutorial && a.lab === b.lab;
-}
-
-function summarise(s: { meetings: { day: string; start: string; end: string }[] }) {
-  if (s.meetings.length === 0) return "no meetings";
-  const days = s.meetings.map((m) => m.day).join("/");
-  return `${days} ${s.meetings[0].start}`;
 }
 
 // Base UI treats value="" as "nothing selected" (SelectRoot.js:185), which
@@ -363,7 +357,7 @@ export function CoursePicker(props: Readonly<{
                       ? [{ items: instructors.map((n) => ({ value: `prof:${n}`, label: n })) }]
                       : [];
                     const lecItems = lectures.length > 0
-                      ? [{ items: lectures.map((s) => ({ value: s.section, label: `${s.section} · ${summarise(s)}` })) }]
+                      ? [{ items: lectures.map((s) => ({ value: s.section, label: `${s.section} · ${summariseMeetings(s.meetings)}` })) }]
                       : [];
 
                     rows.push(
@@ -412,7 +406,7 @@ export function CoursePicker(props: Readonly<{
                                 <SelectLabel>Lecture</SelectLabel>
                                 {lectures.map((s) => (
                                   <SelectItem key={s.section} value={s.section}>
-                                    {s.section} · {summarise(s)}
+                                    {s.section} · {summariseMeetings(s.meetings)}
                                   </SelectItem>
                                 ))}
                               </SelectGroup>
@@ -443,7 +437,7 @@ export function CoursePicker(props: Readonly<{
                           onValueChange={(v) => setPin(code, key, v === ANY ? "" : String(v))}
                           items={[
                             ...(auto ? [] : [{ value: ANY, label: "Any" }]),
-                            ...options.map((s) => ({ value: s.section, label: `${s.section} · ${summarise(s)}` })),
+                            ...options.map((s) => ({ value: s.section, label: `${s.section} · ${summariseMeetings(s.meetings)}` })),
                           ]}
                         >
                           <SelectTrigger
@@ -458,7 +452,7 @@ export function CoursePicker(props: Readonly<{
                             {!auto && <SelectItem value={ANY}>Any</SelectItem>}
                             {options.map((s) => (
                               <SelectItem key={s.section} value={s.section}>
-                                {s.section} · {summarise(s)}
+                                {s.section} · {summariseMeetings(s.meetings)}
                               </SelectItem>
                             ))}
                           </SelectContent>

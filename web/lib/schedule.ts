@@ -123,3 +123,79 @@ export function bonusLabel(b: Bonus) {
   if (b.type === "soft_free_day") return `${b.day} free`;
   return b.type;
 }
+
+export type ScheduleStats = ReturnType<typeof computeStatsFromMeetings>;
+
+/**
+ * The best and worst value each comparative axis takes across a returned set.
+ *
+ * These are properties of the set, not of any one option, so they are computed
+ * once by whoever holds the whole set and passed down - the same reasoning that
+ * puts bestScore and worstScore in ResultsList.
+ */
+export type SetExtremes = {
+  gapsMin: { min: number; max: number };
+  usedDaysCount: { min: number; max: number };
+  latestEndMin: { min: number; max: number };
+};
+
+export type ComparativeChip = { tone: "good" | "bad"; label: string };
+
+/**
+ * How far apart the best and worst option must be on an axis before that axis
+ * is worth a chip.
+ *
+ * Without a floor, a set whose options differ by four minutes of gap would
+ * label one "most gaps" and another "fewest" - technically true, and useless
+ * for choosing between them. Half an hour is roughly the difference a student
+ * would actually plan around; a whole day on campus always is.
+ */
+const SPREAD_FLOOR = { gapsMin: 30, usedDaysCount: 1, latestEndMin: 30 } as const;
+
+export function computeSetExtremes(statsList: ScheduleStats[]): SetExtremes | null {
+  if (statsList.length === 0) return null;
+  const axis = (pick: (s: ScheduleStats) => number) => {
+    const vs = statsList.map(pick);
+    return { min: Math.min(...vs), max: Math.max(...vs) };
+  };
+  return {
+    gapsMin: axis((s) => s.gapsMin),
+    usedDaysCount: axis((s) => s.usedDaysCount),
+    // -1 means "no meetings at all"; it would otherwise masquerade as the
+    // earliest possible finish and win the good chip.
+    latestEndMin: axis((s) => (s.latestEndMin >= 0 ? s.latestEndMin : 0)),
+  };
+}
+
+/**
+ * Why this option stands out against the others returned with it.
+ *
+ * Answers the question the score alone does not: given five schedules that all
+ * satisfy the constraints, what is this one actually trading away? It needs no
+ * preferences to be set, which is what makes it useful - the breakdown chips
+ * only fire for soft preferences a student explicitly asked for, so by default
+ * they are all empty.
+ */
+export function comparativeChips(stats: ScheduleStats, extremes: SetExtremes | null): ComparativeChip[] {
+  if (!extremes) return [];
+  const out: ComparativeChip[] = [];
+
+  const consider = (
+    key: keyof SetExtremes,
+    value: number,
+    lowLabel: string,
+    highLabel: string,
+    lowIsGood = true,
+  ) => {
+    const { min, max } = extremes[key];
+    if (max - min < SPREAD_FLOOR[key]) return; // the set is much of a muchness here
+    if (value === min) out.push({ tone: lowIsGood ? "good" : "bad", label: lowLabel });
+    else if (value === max) out.push({ tone: lowIsGood ? "bad" : "good", label: highLabel });
+  };
+
+  consider("gapsMin", stats.gapsMin, "Fewest gaps", "Most gaps");
+  consider("usedDaysCount", stats.usedDaysCount, "Fewest days on campus", "Most days on campus");
+  consider("latestEndMin", stats.latestEndMin >= 0 ? stats.latestEndMin : 0, "Earliest finish", "Latest finish");
+
+  return out;
+}

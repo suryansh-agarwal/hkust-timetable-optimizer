@@ -78,3 +78,36 @@ export function reconcilePins(data: CourseSections, pins: SectionLock): SectionL
 
   return next;
 }
+
+/**
+ * A section's meeting pattern, with days grouped by the time they actually
+ * meet at.
+ *
+ * The previous form joined every day and then printed `meetings[0].start`, so
+ * a section meeting Monday 16:30 and Friday 09:00 read "Mo/Fr 16:30" - it
+ * asserted a time for a day that never has it, and a student picking a lecture
+ * to lock could not see the Friday morning coming. Days only share a slot in
+ * the label when they share it in the timetable.
+ *
+ * Start times keep the order the API returned them in, which is day order, so
+ * the label reads the way the week does rather than earliest-first.
+ */
+export function summariseMeetings(meetings: { day: string; start: string }[]): string {
+  if (meetings.length === 0) return "no meetings";
+
+  const order: string[] = [];
+  const daysByStart = new Map<string, string[]>();
+
+  for (const m of meetings) {
+    let days = daysByStart.get(m.start);
+    if (!days) {
+      days = [];
+      daysByStart.set(m.start, days);
+      order.push(m.start);
+    }
+    // The same day listed twice at one time is not worth repeating.
+    if (!days.includes(m.day)) days.push(m.day);
+  }
+
+  return order.map((start) => `${daysByStart.get(start)!.join("/")} ${start}`).join(", ");
+}

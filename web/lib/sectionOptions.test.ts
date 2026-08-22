@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { optionsFor, reconcilePins } from "./sectionOptions";
+import { optionsFor, reconcilePins, summariseMeetings } from "./sectionOptions";
 import type { CourseSections } from "./api";
 
 function sec(section: string, type: "LEC" | "TUT" | "LAB", group: string | null) {
@@ -147,5 +147,42 @@ describe("reconcilePins", () => {
   it("is idempotent", () => {
     const once = reconcilePins(MATCHED, { lecture: "L2", tutorial: "T1B" });
     expect(reconcilePins(MATCHED, once)).toEqual(once);
+  });
+});
+
+describe("summariseMeetings", () => {
+  const m = (day: string, start: string) => ({ day, start });
+
+  it("groups days that share a start time", () => {
+    expect(summariseMeetings([m("Tu", "10:30"), m("Th", "10:30")])).toBe("Tu/Th 10:30");
+  });
+
+  it("keeps days apart when their times differ - the bug this exists for", () => {
+    // Monday afternoon, Friday morning. The old form read "Mo/Fr 16:30" and
+    // hid the 09:00 entirely.
+    expect(summariseMeetings([m("Mo", "16:30"), m("Fr", "09:00")])).toBe("Mo 16:30, Fr 09:00");
+  });
+
+  it("handles a mix of shared and unshared times", () => {
+    expect(summariseMeetings([m("Mo", "09:00"), m("We", "09:00"), m("Fr", "14:00")]))
+      .toBe("Mo/We 09:00, Fr 14:00");
+  });
+
+  it("reads a single meeting plainly", () => {
+    expect(summariseMeetings([m("We", "13:00")])).toBe("We 13:00");
+  });
+
+  it("says so when a section has no meetings rather than rendering an empty string", () => {
+    expect(summariseMeetings([])).toBe("no meetings");
+  });
+
+  it("preserves day order rather than sorting by time", () => {
+    // Friday is earlier in the day but later in the week; the label should
+    // read the way the week does.
+    expect(summariseMeetings([m("Mo", "16:30"), m("Fr", "09:00")])).toMatch(/^Mo /);
+  });
+
+  it("does not repeat a day that meets twice in the same slot", () => {
+    expect(summariseMeetings([m("Mo", "09:00"), m("Mo", "09:00")])).toBe("Mo 09:00");
   });
 });
