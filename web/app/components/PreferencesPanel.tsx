@@ -54,6 +54,9 @@ export function PreferencesPanel({
     // would be a hydration mismatch.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setOpenByDefault(window.matchMedia("(min-width: 1024px)").matches);
+    // The disable above covers this call too: the rule reports once per
+    // effect, on whichever setState it reaches first. Reordering these two
+    // lines would move the violation here, unguarded, and fail lint.
     setBeforeHydration(false);
   }, []);
 
