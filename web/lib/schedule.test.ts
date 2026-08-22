@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  computeSetExtremes,
+  comparativeChips,
   computeStatsFromMeetings,
   flattenSchedule,
   formatDayList,
@@ -157,5 +159,62 @@ describe("bonusLabel", () => {
 
   it("falls through to the raw type name for anything unlabelled", () => {
     expect(bonusLabel({ type: "some_future_bonus" })).toBe("some_future_bonus");
+  });
+});
+
+describe("computeSetExtremes / comparativeChips", () => {
+  const statsFor = (meetings: Meeting[]) => computeStatsFromMeetings(meetings);
+
+  // three options that differ on every axis by more than the floor
+  const tight = statsFor([mtg("Mo", 540, 600), mtg("Mo", 600, 660)]);                 // 0 gap, 1 day, ends 660
+  const loose = statsFor([mtg("Mo", 540, 600), mtg("Mo", 780, 840)]);                 // 180 gap, 1 day, ends 840
+  const spread = statsFor([mtg("Mo", 540, 600), mtg("Tu", 540, 600), mtg("We", 540, 600)]); // 0 gap, 3 days, ends 600
+
+  const extremes = computeSetExtremes([tight, loose, spread]);
+
+  it("returns null for an empty set rather than Infinity extremes", () => {
+    expect(computeSetExtremes([])).toBeNull();
+  });
+
+  it("labels the option at each end of an axis", () => {
+    expect(comparativeChips(loose, extremes)).toContainEqual({ tone: "bad", label: "Most gaps" });
+    expect(comparativeChips(loose, extremes)).toContainEqual({ tone: "bad", label: "Latest finish" });
+    expect(comparativeChips(spread, extremes)).toContainEqual({ tone: "bad", label: "Most days on campus" });
+    expect(comparativeChips(spread, extremes)).toContainEqual({ tone: "good", label: "Earliest finish" });
+  });
+
+  it("stays silent on an axis whose spread is below the floor", () => {
+    // both end within 10 minutes and use one day - only gaps should speak
+    const a = statsFor([mtg("Mo", 540, 600), mtg("Mo", 600, 660)]);
+    const b = statsFor([mtg("Mo", 540, 600), mtg("Mo", 780, 670 + 200)]);
+    const e = computeSetExtremes([a, b])!;
+    const labels = [...comparativeChips(a, e), ...comparativeChips(b, e)].map((c) => c.label);
+    expect(labels).not.toContain("Fewest days on campus");
+    expect(labels).not.toContain("Most days on campus");
+  });
+
+  it("says nothing at all when every option is identical", () => {
+    const same = statsFor([mtg("Mo", 540, 600)]);
+    const e = computeSetExtremes([same, same, same])!;
+    expect(comparativeChips(same, e)).toEqual([]);
+  });
+
+  it("gives every tied option the same chip rather than picking one arbitrarily", () => {
+    const a = statsFor([mtg("Mo", 540, 600), mtg("Mo", 600, 660)]);   // 0 gap
+    const b = statsFor([mtg("Tu", 540, 600), mtg("Tu", 600, 660)]);   // 0 gap, ties a
+    const c = statsFor([mtg("We", 540, 600), mtg("We", 780, 840)]);   // 180 gap
+    const e = computeSetExtremes([a, b, c])!;
+    expect(comparativeChips(a, e)).toContainEqual({ tone: "good", label: "Fewest gaps" });
+    expect(comparativeChips(b, e)).toContainEqual({ tone: "good", label: "Fewest gaps" });
+  });
+
+  it("normalises an empty schedule's -1 sentinel so the extremes never go negative", () => {
+    const empty = statsFor([]);
+    const real = statsFor([mtg("Mo", 540, 600)]);
+    const e = computeSetExtremes([empty, real])!;
+    // -1 means "no meetings", not "finished before midnight" - left raw it
+    // would drag the axis minimum below zero and widen every spread by one.
+    expect(e.latestEndMin.min).toBe(0);
+    expect(e.latestEndMin.max).toBe(600);
   });
 });

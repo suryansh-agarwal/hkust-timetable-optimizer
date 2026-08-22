@@ -4,7 +4,10 @@ import { useMemo } from "react";
 import { TimetableGrid, GRID_MIN_WIDTH_PX } from "./TimetableGrid";
 import { ResultCard, type OptimizerResult } from "./ResultCard";
 import { Badge } from "@/components/ui/badge";
-import { flattenSchedule, penaltyLabel, bonusLabel, type Bonus, type Penalty } from "@/lib/schedule";
+import {
+  flattenSchedule, penaltyLabel, bonusLabel, computeStatsFromMeetings, computeSetExtremes,
+  type Bonus, type Penalty,
+} from "@/lib/schedule";
 
 export function ResultsList({
   results,
@@ -32,6 +35,15 @@ export function ResultsList({
   const bestScore = results.length > 0 ? Math.max(...results.map((r) => r.score)) : 0;
   const worstScore = results.length > 0 ? Math.min(...results.map((r) => r.score)) : 0;
 
+  // Same reasoning, one step further: each card's own stats are derived here
+  // too, so the set-wide extremes and the per-card values come from a single
+  // pass. Computing stats in both places would be two sources for one number.
+  const statsList = useMemo(
+    () => results.map((r) => computeStatsFromMeetings(flattenSchedule(r.schedule))),
+    [results],
+  );
+  const extremes = useMemo(() => computeSetExtremes(statsList), [statsList]);
+
   return (
     <>
       <div>
@@ -48,6 +60,8 @@ export function ResultsList({
             key={i}
             result={r}
             index={i}
+            stats={statsList[i]}
+            extremes={extremes}
             bestScore={bestScore}
             worstScore={worstScore}
             isActive={i === activeIdx}
