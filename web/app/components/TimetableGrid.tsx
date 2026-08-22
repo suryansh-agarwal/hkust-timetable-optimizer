@@ -89,6 +89,9 @@ const GRID_START_HOUR = 8;
 const GRID_END_HOUR = 20;
 const HOUR_ROW_HEIGHT = 64; // px per hour
 
+/** Horizontal space between two overlapping classes in the same day column. */
+const LANE_GAP_PX = 6;
+
 /**
  * The narrowest the grid can render without its columns collapsing: an 80px
  * time gutter plus five day columns at a 128px floor. Consumers wrap the grid
@@ -189,6 +192,70 @@ function blockDetail(height: number): "full" | "code-and-section" | "code-only" 
   return "code-only";
 }
 
+type GridBlockProps = {
+  meeting: Meeting;
+  colors: { bg: string; border: string; ink: string };
+  label: string;
+  top: number;
+  height: number;
+  leftPct: number;
+  laneWidthPct: number;
+  /** The two grids animate different properties: only the compare grid fades. */
+  transitionClass: string;
+  /** Compare grid only - dims the side that is not hovered or focused. */
+  overlay?: { opacity: number; zIndex: number };
+  /** Compare grid only - drives that dimming from pointer and keyboard alike. */
+  interaction?: Pick<
+    React.HTMLAttributes<HTMLDivElement>,
+    "onMouseEnter" | "onMouseLeave" | "onFocus" | "onBlur"
+  >;
+};
+
+function GridBlock({
+  meeting: m, colors, label, top, height, leftPct, laneWidthPct,
+  transitionClass, overlay, interaction,
+}: GridBlockProps) {
+  const detail = blockDetail(height);
+  return (
+    <div
+      data-slot="grid-block"
+      role="group"
+      tabIndex={0}
+      aria-label={label}
+      title={label}
+      className={cn(
+        "shadow-[var(--elev-1)] hover:shadow-[var(--shadow-md)]",
+        transitionClass,
+        detail === "code-only" ? "px-1.5 py-px" : "p-1.5"
+      )}
+      {...interaction}
+      style={{
+        position: "absolute",
+        top,
+        height,
+        left: `calc(${leftPct}% + ${LANE_GAP_PX / 2}px)`,
+        width: `calc(${laneWidthPct}% - ${LANE_GAP_PX}px)`,
+        borderRadius: 10,
+        border: `2px solid ${colors.border}`,
+        fontSize: 12,
+        background: colors.bg,
+        overflow: "hidden",
+        ...overlay,
+      }}
+    >
+      <div className="text-xs font-bold leading-tight" style={{ color: colors.ink }}>{m.course_code}</div>
+      {detail !== "code-only" && (
+        <div className="text-xs leading-tight" style={{ color: colors.ink }}>{m.section}</div>
+      )}
+      {detail === "full" && (
+        <div className="mt-1 text-[11px] leading-tight" style={{ color: colors.ink }}>
+          {minutesToHHMM(m.start_min)}–{minutesToHHMM(m.end_min)}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function TimetableGrid(props: {
   meetings: Meeting[];
   startHour?: number; // default 8
@@ -251,7 +318,6 @@ export function TimetableGrid(props: {
 
                 // lane width (avoid division by 0)
                 const lanes = Math.max(1, laneCount);
-                const gap = 6;
                 const laneWidthPct = 100 / lanes;
                 const leftPct = m.lane * laneWidthPct;
 
@@ -259,43 +325,19 @@ export function TimetableGrid(props: {
                 const colors = subjectColors.get(subject) ?? SUBJECT_COLORS[0];
 
                 const label = `${m.course_code} ${m.section}, ${DAY_LABELS[m.day] ?? m.day} ${minutesToHHMM(m.start_min)} to ${minutesToHHMM(m.end_min)}`;
-                const detail = blockDetail(height);
 
                 return (
-                  <div
+                  <GridBlock
                     key={idx}
-                    data-slot="grid-block"
-                    role="group"
-                    tabIndex={0}
-                    aria-label={label}
-                    title={label}
-                    className={cn(
-                      "shadow-[var(--elev-1)] transition-shadow duration-150 hover:shadow-[var(--shadow-md)]",
-                      detail === "code-only" ? "px-1.5 py-px" : "p-1.5"
-                    )}
-                    style={{
-                      position: "absolute",
-                      top,
-                      height,
-                      left: `calc(${leftPct}% + ${gap / 2}px)`,
-                      width: `calc(${laneWidthPct}% - ${gap}px)`,
-                      borderRadius: 10,
-                      border: `2px solid ${colors.border}`,
-                      fontSize: 12,
-                      background: colors.bg,
-                      overflow: "hidden",
-                    }}
-                  >
-                    <div className="text-xs font-bold leading-tight" style={{ color: colors.ink }}>{m.course_code}</div>
-                    {detail !== "code-only" && (
-                      <div className="text-xs leading-tight" style={{ color: colors.ink }}>{m.section}</div>
-                    )}
-                    {detail === "full" && (
-                      <div className="mt-1 text-[11px] leading-tight" style={{ color: colors.ink }}>
-                        {minutesToHHMM(m.start_min)}–{minutesToHHMM(m.end_min)}
-                      </div>
-                    )}
-                  </div>
+                    meeting={m}
+                    colors={colors}
+                    label={label}
+                    top={top}
+                    height={height}
+                    leftPct={leftPct}
+                    laneWidthPct={laneWidthPct}
+                    transitionClass="transition-shadow duration-150"
+                  />
                 );
               })}
             </DayColumn>
@@ -372,7 +414,6 @@ export function CompareTimetableGrid(props: {
                 const height = Math.max(22, (m.end_min - m.start_min) * pxPerMin);
 
                 const lanes = Math.max(1, laneCount);
-                const gap = 6;
                 const laneWidthPct = 100 / lanes;
                 const leftPct = m.lane * laneWidthPct;
 
@@ -383,49 +424,26 @@ export function CompareTimetableGrid(props: {
                 const opacity = isDimmedByHover ? 0.25 : 1;
 
                 const label = `Option ${m.side}, ${m.course_code} ${m.section}, ${DAY_LABELS[m.day] ?? m.day} ${minutesToHHMM(m.start_min)} to ${minutesToHHMM(m.end_min)}`;
-                const detail = blockDetail(height);
 
                 return (
-                  <div
+                  <GridBlock
                     key={`${m.side}-${idx}`}
-                    data-slot="grid-block"
-                    role="group"
-                    tabIndex={0}
-                    aria-label={label}
-                    title={label}
-                    className={cn(
-                      "shadow-[var(--elev-1)] transition-[opacity,box-shadow] duration-150 ease-in-out hover:shadow-[var(--shadow-md)]",
-                      detail === "code-only" ? "px-1.5 py-px" : "p-1.5"
-                    )}
-                    onMouseEnter={() => setHoveredSide(m.side)}
-                    onMouseLeave={() => setHoveredSide(null)}
-                    onFocus={() => setHoveredSide(m.side)}
-                    onBlur={() => setHoveredSide(null)}
-                    style={{
-                      position: "absolute",
-                      top,
-                      height,
-                      left: `calc(${leftPct}% + ${gap / 2}px)`,
-                      width: `calc(${laneWidthPct}% - ${gap}px)`,
-                      borderRadius: 10,
-                      border: `2px solid ${colors.border}`,
-                      fontSize: 12,
-                      background: colors.bg,
-                      overflow: "hidden",
-                      opacity,
-                      zIndex: hoveredSide === m.side ? 10 : 1,
+                    meeting={m}
+                    colors={colors}
+                    label={label}
+                    top={top}
+                    height={height}
+                    leftPct={leftPct}
+                    laneWidthPct={laneWidthPct}
+                    transitionClass="transition-[opacity,box-shadow] duration-150 ease-in-out"
+                    overlay={{ opacity, zIndex: hoveredSide === m.side ? 10 : 1 }}
+                    interaction={{
+                      onMouseEnter: () => setHoveredSide(m.side),
+                      onMouseLeave: () => setHoveredSide(null),
+                      onFocus: () => setHoveredSide(m.side),
+                      onBlur: () => setHoveredSide(null),
                     }}
-                  >
-                    <div className="text-xs font-bold leading-tight" style={{ color: colors.ink }}>{m.course_code}</div>
-                    {detail !== "code-only" && (
-                      <div className="text-xs leading-tight" style={{ color: colors.ink }}>{m.section}</div>
-                    )}
-                    {detail === "full" && (
-                      <div className="mt-1 text-[11px] leading-tight" style={{ color: colors.ink }}>
-                        {minutesToHHMM(m.start_min)}–{minutesToHHMM(m.end_min)}
-                      </div>
-                    )}
-                  </div>
+                  />
                 );
               })}
             </DayColumn>
