@@ -11,7 +11,7 @@ function block(selector: string): string {
 }
 function hues(scope: string): [string, number, number, number][] {
   const out: [string, number, number, number][] = [];
-  for (const m of scope.matchAll(/--(sub-[1-8]):\s*([\d.]+)\s+([\d.]+)%\s+([\d.]+)%/g)) {
+  for (const m of scope.matchAll(/--(sub-[1-8]|cmp-[ab]):\s*([\d.]+)\s+([\d.]+)%\s+([\d.]+)%/g)) {
     out.push([m[1], Number(m[2]), Number(m[3]) / 100, Number(m[4]) / 100]);
   }
   return out;
@@ -77,7 +77,7 @@ describe("subject block ink meets WCAG AA on its own fill", () => {
     it(`every hue reaches 4.5:1 in ${theme}`, () => {
       const scoped = block(scope);
       const list = hues(scoped);
-      expect(list).toHaveLength(8);
+      expect(list).toHaveLength(10);
       const p = inkMix(scoped);
       for (const [name, h, s, l] of list) {
         const hue = hslToRgb(h, s, l);

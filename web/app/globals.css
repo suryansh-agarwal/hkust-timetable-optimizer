@@ -57,6 +57,9 @@
 
   --overlay: oklch(0 0 0 / 0.35);
   --shadow-md: 0 2px 10px oklch(0 0 0 / 0.08);
+  /* The block's resting elevation - theme-aware, where Tailwind's own
+     shadow-* scale is a fixed black and does not read against a dark card. */
+  --elev-1: 0 1px 3px oklch(0 0 0 / 0.08);
 
   --login-canvas: linear-gradient(135deg, oklch(0.9800 0.0040 250) 0%, oklch(0.9550 0.0090 255) 100%);
   --login-badge: oklch(0.2079 0.0399 265.73);
@@ -140,6 +143,9 @@
 
   --overlay: oklch(0 0 0 / 0.60);
   --shadow-md: 0 2px 12px oklch(0 0 0 / 0.55);
+  /* The block's resting elevation - theme-aware, where Tailwind's own
+     shadow-* scale is a fixed black and does not read against a dark card. */
+  --elev-1: 0 1px 3px oklch(0 0 0 / 0.50);
 
   --login-canvas: linear-gradient(135deg, oklch(0.1371 0.0360 258.53) 0%, oklch(0.2000 0.0350 259) 100%);
   --login-badge: oklch(0.2800 0.0369 259.97);
