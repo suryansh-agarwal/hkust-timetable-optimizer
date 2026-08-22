@@ -214,6 +214,18 @@ def _describe_lock(instructor_lock: Optional[str], section_lock: Optional[Dict[s
     return " and ".join(parts) if parts else "the selected constraints"
 
 
+def _describe_hard_rule(rule: Dict[str, Optional[str]]) -> str:
+    """One hard rule in the words a student set it in."""
+    kind, day, cutoff = rule["type"], rule.get("day"), rule.get("cutoff")
+    if kind == "hard_free_day_violation":
+        return f"{day} must be free"
+    if kind == "hard_no_after_violation":
+        return f"no classes after {cutoff} on {day}"
+    if kind == "hard_no_before_violation":
+        return f"no classes before {cutoff} on {day}"
+    return kind
+
+
 @app.post("/optimize/ranked")
 def optimize_ranked(req: OptimizeRankedRequest):
     if not req.course_codes:
@@ -315,6 +327,7 @@ def optimize_ranked(req: OptimizeRankedRequest):
             unique_pool.append(sch)
 
     scored = []
+    rejected_breakdowns = []
     for sch in unique_pool:
         s, why = score_schedule(sch, req.prefs)
         # Filter on the explicit flag, not on the score. This compared against
@@ -324,6 +337,32 @@ def optimize_ranked(req: OptimizeRankedRequest):
         # timetable exists.
         if not why.get("rejected"):
             scored.append((s, why, sch))
+        else:
+            # Kept only to explain a total rejection below; discarded otherwise.
+            rejected_breakdowns.append(why)
+
+    # Schedules exist and every one breaks a hard rule. The course selection is
+    # not the problem, which is the single most useful thing to tell a student
+    # here - the old message said the opposite.
+    if not scored and rejected_breakdowns:
+        rules = blocking_hard_rules(rejected_breakdowns)
+        described = "; ".join(_describe_hard_rule(r) for r in rules)
+        count = len(rejected_breakdowns)
+        noun = "timetable" if count == 1 else "timetables"
+        joiner = "breaks" if len(rules) == 1 else "breaks at least one of"
+        return {
+            "ok": False,
+            "error": (
+                f"{count} {noun} fit your courses, but every one {joiner}: {described}. "
+                "Relax that rule, or make it a soft preference, to see them."
+                if len(rules) == 1 else
+                f"{count} {noun} fit your courses, but every one {joiner}: {described}. "
+                "Relax one of those rules, or make it a soft preference, to see them."
+            ),
+            "infeasible_because": "hard_preferences",
+            "subjects_fetched": subjects_fetched,
+            "cache_misses": cache_misses,
+        }
 
     scored.sort(key=lambda x: x[0], reverse=True)
     top = scored[: req.max_solutions]

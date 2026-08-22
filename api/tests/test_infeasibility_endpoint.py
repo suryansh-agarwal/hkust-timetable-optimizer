@@ -86,3 +86,45 @@ def test_courses_that_do_fit_still_succeed(monkeypatch):
     assert data["ok"] is True
     assert len(data["results"]) >= 1
     assert "infeasible_because" not in data
+
+
+def test_a_hard_rule_that_rejects_everything_is_named(monkeypatch):
+    # One course, one lecture, Monday 16:30-17:50. A hard cutoff of 15:00 on
+    # Monday rejects the only schedule that exists - so the course list is
+    # fine and the rule is the problem.
+    courses = {
+        "COMP 2011": Course(
+            course_code="COMP 2011", title="Programming with C++", units=4,
+            sections=[lecture("L1", 1001, "Mo", 0, 990, 1070)],
+        ),
+    }
+    client = client_for(monkeypatch, courses)
+
+    data = post(client, course_codes=["COMP 2011"], prefs={"hard_no_after": {"Mo": "15:00"}})
+
+    assert data["ok"] is False
+    assert data["infeasible_because"] == "hard_preferences"
+    assert "1 timetable" in data["error"]
+    assert "15:00" in data["error"] and "Mo" in data["error"]
+
+
+def test_a_hard_rule_that_rejects_only_some_schedules_is_not_named(monkeypatch):
+    # Two lectures, one at 09:00 and one at 16:30, against a 15:00 cutoff. One
+    # schedule survives, so there is an answer and no diagnosis at all - naming
+    # the cutoff here would send the student to relax a rule that was working.
+    courses = {
+        "COMP 2011": Course(
+            course_code="COMP 2011", title="Programming with C++", units=4,
+            sections=[
+                lecture("L1", 1001, "Mo", 0, 540, 620),
+                lecture("L2", 1002, "Mo", 0, 990, 1070),
+            ],
+        ),
+    }
+    client = client_for(monkeypatch, courses)
+
+    data = post(client, course_codes=["COMP 2011"], prefs={"hard_no_after": {"Mo": "15:00"}})
+
+    assert data["ok"] is True
+    assert len(data["results"]) == 1
+    assert "infeasible_because" not in data

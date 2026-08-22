@@ -94,8 +94,11 @@ def test_a_hard_free_day_removes_the_offending_schedule(client):
 
 def test_an_impossible_hard_free_day_returns_no_results(client):
     # Every section of the course meets on Mo or Tu, so freeing both is impossible.
+    # /optimize/ranked now diagnoses this rather than returning an empty
+    # ok:True list - see test_infeasibility_endpoint.py for the message.
     data = post(client, {"hard_free_days": ["Mo", "Tu"]})
-    assert data["results"] == []
+    assert data["ok"] is False
+    assert data["infeasible_because"] == "hard_preferences"
 
 
 def test_a_soft_free_day_still_only_penalises(client):
