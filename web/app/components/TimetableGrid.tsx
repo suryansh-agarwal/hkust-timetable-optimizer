@@ -21,6 +21,8 @@ const DAYS: { key: string; label: string }[] = [
   { key: "Fr", label: "Fri" },
 ];
 
+const DAY_LABELS: Record<string, string> = Object.fromEntries(DAYS.map((d) => [d.key, d.label]));
+
 function clamp(n: number, lo: number, hi: number) {
   return Math.max(lo, Math.min(hi, n));
 }
@@ -229,11 +231,16 @@ export function TimetableGrid(props: {
                 const subject = getSubjectFromCode(m.course_code);
                 const colors = subjectColors.get(subject) ?? SUBJECT_COLORS[0];
 
+                const label = `${m.course_code} ${m.section}, ${DAY_LABELS[m.day] ?? m.day} ${minutesToHHMM(m.start_min)} to ${minutesToHHMM(m.end_min)}`;
+
                 return (
                   <div
                     key={idx}
                     data-slot="grid-block"
-                    title={`${m.course_code} ${m.section}\n${m.day} ${minutesToHHMM(m.start_min)}–${minutesToHHMM(m.end_min)}`}
+                    tabIndex={0}
+                    aria-label={label}
+                    title={label}
+                    className="shadow-sm transition-shadow duration-150 hover:shadow-md"
                     style={{
                       position: "absolute",
                       top,
@@ -245,7 +252,6 @@ export function TimetableGrid(props: {
                       padding: 8,
                       fontSize: 12,
                       background: colors.bg,
-                      boxShadow: "var(--shadow-sm)",
                       overflow: "hidden",
                     }}
                   >
@@ -337,17 +343,24 @@ export function CompareTimetableGrid(props: {
 
                 const colors = m.side === "A" ? colorA : colorB;
 
-                // Determine opacity based on hover state
-                const isHiddenBecauseHover = hoveredSide !== null && hoveredSide !== m.side;
-                const opacity = isHiddenBecauseHover ? 0.1 : 1;
+                // Determine opacity based on hover/focus state
+                const isDimmedByHover = hoveredSide !== null && hoveredSide !== m.side;
+                const opacity = isDimmedByHover ? 0.25 : 1;
+
+                const label = `Option ${m.side}, ${m.course_code} ${m.section}, ${DAY_LABELS[m.day] ?? m.day} ${minutesToHHMM(m.start_min)} to ${minutesToHHMM(m.end_min)}`;
 
                 return (
                   <div
                     key={`${m.side}-${idx}`}
                     data-slot="grid-block"
-                    title={`[${m.side}] ${m.course_code} ${m.section}\n${m.day} ${minutesToHHMM(m.start_min)}–${minutesToHHMM(m.end_min)}`}
+                    tabIndex={0}
+                    aria-label={label}
+                    title={label}
+                    className="shadow-sm transition-shadow duration-150 hover:shadow-md"
                     onMouseEnter={() => setHoveredSide(m.side)}
                     onMouseLeave={() => setHoveredSide(null)}
+                    onFocus={() => setHoveredSide(m.side)}
+                    onBlur={() => setHoveredSide(null)}
                     style={{
                       position: "absolute",
                       top,
@@ -359,11 +372,9 @@ export function CompareTimetableGrid(props: {
                       padding: 8,
                       fontSize: 12,
                       background: colors.bg,
-                      boxShadow: "var(--shadow-sm)",
                       overflow: "hidden",
                       opacity,
-                      transition: "opacity 0.15s ease-in-out",
-                      cursor: "pointer",
+                      transition: "opacity 0.15s ease-in-out, box-shadow 0.15s ease-in-out",
                       zIndex: hoveredSide === m.side ? 10 : 1,
                     }}
                   >
